@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: data-platform
+
+  # 数据库配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/data_platform?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: fra2781@
+
+  # 禁用Security自动配置（临时）
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+
+# JWT配置
+jwt:
+  secret: test-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm-to-work-properly
+  expiration: 86400000
+
+# 加密配置
+encrypt:
+  secret-key: 12345678901234567890123456789012
+
+# MyBatis-Plus配置
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.dataplatform: DEBUG

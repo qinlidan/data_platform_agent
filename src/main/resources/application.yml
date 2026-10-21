@@ -1,0 +1,87 @@
+spring:
+  application:
+    name: data-platform
+
+  # 数据库配置 - 请根据实际环境修改
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/data_platform?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: fra2781@
+
+  jackson:
+    time-zone: GMT+8
+    date-format: yyyy-MM-dd HH:mm:ss
+    serialization:
+      write-dates-as-timestamps: false
+
+  # Spring AI 配置 - 禁用默认的 OpenAI 自动配置
+  ai:
+    openai:
+      api-key: dummy
+      base-url: https://api.openai.com
+      chat:
+        enabled: false
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath*:/mapper/**/*.xml
+
+# JWT 配置
+jwt:
+  secret: dataplatform-secret-key-for-jwt-token-generation-2024
+  expiration: 86400000  # 24小时，单位：毫秒
+
+# 服务器配置
+server:
+  port: 8089
+  servlet:
+    context-path: /
+
+# SpringDoc 配置
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+
+# Actuator 配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'  # 暴露所有端点
+  endpoint:
+    health:
+      show-details: always  # 显示健康检查详情
+
+# 日志配置
+logging:
+  level:
+    com.dataplatform: debug
+    org.springframework.security: debug
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{50} - %msg%n"
+
+# AI 配置
+ai:
+  dashscope:
+    # qwen3.8-flash - 主模型，用于意图识别和工具调用
+    api-key: ${DASHSCOPE_API_KEY}
+    base-url: https://ws-0qvl6bswjpub8oz9.cn-beijing.maas.aliyuncs.com/compatible-mode
+    model: qwen3.8-flash  # 改为  (原 qwen-plus)
+  deepseek:
+    # DeepSeek-V3 - 备用模型，用于复杂推理
+    api-key: ${DEEPSEEK_API_KEY}
+    base-url: https://api.deepseek.com
+    model: deepseek-chat

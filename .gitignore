@@ -1,0 +1,79 @@
+# 环境变量文件（包含敏感信息）
+.env
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+*.log
+*.iml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+dist/
+dist-ssr/
+*.local
+
+# Logs
+logs/
+*.log
+log/
+
+# Database
+*.sql
+!deploy/mysql/init.sql
+!src/main/resources/db/schema.sql
+
+# Docker volumes data
+mysql_data/
+backend_logs/
+
+# Backup files
+*.bak
+*.backup
+backup_*.sql.gz
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Test
+test-output/
+.pytest_cache/
+
+# Coverage
+coverage/
+*.cover
+.coverage
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
