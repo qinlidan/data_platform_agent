@@ -92,3 +92,23 @@ ai:
     api-key: ${DEEPSEEK_API_KEY}
     base-url: https://api.deepseek.com
     model: deepseek-chat
+
+  # Spring Mail 邮件服务配置
+  # 生产环境建议：
+  # 1. 使用更安全的邮件服务（如AWS SES、SendGrid）
+  # 2. 通过环境变量设置敏感信息（MAIL_PASSWORD）
+  # 3. 支持多种SMTP服务器配置
+  mail:
+    host: ${MAIL_HOST:smtp.163.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:17766238993@163.com}
+    password: ${MAIL_PASSWORD:ZRYM339mZrztCZyA}
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+            required: true
+    default-encoding: UTF-8
