@@ -1,6 +1,5 @@
 package com.dataplatform.dto;
 
-import com.dataplatform.enums.DataType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -16,10 +15,10 @@ public class FieldMetadataRequest {
     @NotBlank(message = "字段名不能为空")
     private String fieldName;
 
-    @NotNull(message = "数据类型不能为空")
-    private DataType dataType;
+    @NotBlank(message = "字段类型不能为空")
+    private String fieldType;
 
-    private String comment;
+    private String fieldComment;
 
     private Boolean isPrimaryKey;
 

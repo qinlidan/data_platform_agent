@@ -1,0 +1,12 @@
+{
+  "jobVersionId": 1,
+  "fields": [
+    {
+      "fieldName": "id",
+      "fieldComment": "ID field",
+      "fieldType": "string",
+      "isPrimaryKey": false,
+      "isPartitionKey": false
+    }
+  ]
+}

@@ -62,29 +62,27 @@ public class JobTool {
     }
 
     @Tool(description = """
-        查询作业详情。根据作业编码（jobCode）获取作业的完整信息，包括：
-        - 基本信息：作业编码、名称、类型、状态
+        查询作业详情。根据作业ID获取作业的完整信息，包括：
+        - 基本信息：作业名称、中文名称、类型、状态
         - 数据源配置：源库表、目标库表、执行引擎
         - 版本信息：当前版本、发布版本
         - 创建和更新时间
 
         参数：
-        - jobCode: 作业编码，必填
+        - jobId: 作业ID，必填
 
         返回：格式化的作业详情字符串
         """)
-    public String getJobDetails(@ToolParam(description = "作业编码，例如 job_001") String jobCode) {
+    public String getJobDetails(@ToolParam(description = "作业ID") Long jobId) {
         try {
-            log.info("[AI Tool] getJobDetails - jobCode: {}", jobCode);
-            Job job = jobService.getByCode(jobCode);
-            if (job == null) {
-                return "未找到作业编码为 " + jobCode + " 的作业";
-            }
+            log.info("[AI Tool] getJobDetails - jobId: {}", jobId);
+            Job job = jobService.getById(jobId);
 
             return String.format("""
                 作业详情：
-                - 作业编码：%s
+                - 作业ID：%d
                 - 作业名称：%s
+                - 作业中文名称：%s
                 - 作业类型：%s
                 - 状态：%s
                 - 源数据源ID：%d
@@ -96,7 +94,7 @@ public class JobTool {
                 - 创建时间：%s
                 - 更新时间：%s
                 """,
-                    job.getJobCode(), job.getJobName(), job.getJobType(), job.getStatus(),
+                    job.getId(), job.getJobName(), job.getJobCnName(), job.getJobType(), job.getStatus(),
                     job.getSourceDatasourceId(), job.getSourceDatabase(), job.getSourceTable(),
                     job.getTargetDatabase(), job.getTargetTable(), job.getEngineType(),
                     job.getCurrentVersion(), job.getPublishedVersion(),
@@ -140,8 +138,9 @@ public class JobTool {
 
             for (Job job : jobs) {
                 Map<String, Object> row = Map.of(
-                        "jobCode", job.getJobCode(),
+                        "id", job.getId(),
                         "jobName", job.getJobName(),
+                        "jobCnName", job.getJobCnName(),
                         "jobType", job.getJobType().toString(),
                         "status", job.getStatus().toString(),
                         "sourceTable", job.getSourceDatabase() + "." + job.getSourceTable(),
@@ -197,8 +196,9 @@ public class JobTool {
 
             for (Job job : jobs) {
                 Map<String, Object> row = Map.of(
-                        "jobCode", job.getJobCode(),
+                        "id", job.getId(),
                         "jobName", job.getJobName(),
+                        "jobCnName", job.getJobCnName(),
                         "jobType", job.getJobType().toString(),
                         "status", job.getStatus().toString(),
                         "sourceTable", job.getSourceDatabase() + "." + job.getSourceTable(),
@@ -221,8 +221,8 @@ public class JobTool {
         创建新作业。根据提供的参数创建一个新的ETL作业。
 
         参数：
-        - jobCode: 作业编码（必填）
-        - jobName: 作业名称（必填）
+        - jobName: 作业名称（英文标识，必填）
+        - jobCnName: 作业中文名称（必填）
         - jobType: 作业类型，DB2HIVE 或 HIVE2HIVE（必填）
         - sourceDatasourceCode: 源数据源编码（必填，例如 DB2_PROD）
         - sourceDatabase: 源数据库名（必填）
@@ -235,8 +235,8 @@ public class JobTool {
         返回：操作结果描述
         """)
     public String createJob(
-            @ToolParam(description = "jobCode") String jobCode,
             @ToolParam(description = "jobName") String jobName,
+            @ToolParam(description = "jobCnName") String jobCnName,
             @ToolParam(description = "jobType") String jobType,
             @ToolParam(description = "sourceDatasourceCode") String sourceDatasourceCode,
             @ToolParam(description = "sourceDatabase") String sourceDatabase,
@@ -247,7 +247,7 @@ public class JobTool {
             @ToolParam(description = "description") String description
     ) {
         try {
-            log.info("[AI Tool] createJob - jobCode: {}, jobName: {}", jobCode, jobName);
+            log.info("[AI Tool] createJob - jobName: {}, jobCnName: {}", jobName, jobCnName);
 
             // 通过数据源编码查找数据源ID
             DataSource dataSource = dataSourceService.getByCode(sourceDatasourceCode);
@@ -256,8 +256,8 @@ public class JobTool {
             }
 
             JobCreateRequest request = new JobCreateRequest();
-            request.setJobCode(jobCode);
             request.setJobName(jobName);
+            request.setJobCnName(jobCnName);
             request.setJobType(JobType.valueOf(jobType));
             request.setSourceDatasourceId(dataSource.getId());
             request.setSourceDatabase(sourceDatabase);
@@ -268,7 +268,8 @@ public class JobTool {
             request.setDescription(description);
 
             Job job = jobService.create(request);
-            return String.format("作业创建成功！作业编码：%s，作业名称：%s", job.getJobCode(), job.getJobName());
+            return String.format("作业创建成功！作业ID：%d，作业名称：%s，中文名称：%s",
+                    job.getId(), job.getJobName(), job.getJobCnName());
         } catch (BusinessException e) {
             log.error("[AI Tool] createJob 业务异常", e);
             return "创建失败：" + e.getMessage();
@@ -282,8 +283,8 @@ public class JobTool {
         修改作业配置。更新作业的配置信息（仅限草稿状态的作业）。
 
         参数：
-        - jobCode: 作业编码（必填）
-        - jobName: 新的作业名称（可选）
+        - jobId: 作业ID（必填）
+        - jobCnName: 新的作业中文名称（可选）
         - sourceDatabase: 新的源数据库名（可选）
         - sourceTable: 新的源表名（可选）
         - targetDatabase: 新的目标数据库名（可选）
@@ -293,8 +294,8 @@ public class JobTool {
         返回：操作结果描述
         """)
     public String updateJobConfig(
-            @ToolParam(description = "jobCode") String jobCode,
-            @ToolParam(description = "jobName") String jobName,
+            @ToolParam(description = "jobId") Long jobId,
+            @ToolParam(description = "jobCnName") String jobCnName,
             @ToolParam(description = "sourceDatabase") String sourceDatabase,
             @ToolParam(description = "sourceTable") String sourceTable,
             @ToolParam(description = "targetDatabase") String targetDatabase,
@@ -302,15 +303,12 @@ public class JobTool {
             @ToolParam(description = "description") String description
     ) {
         try {
-            log.info("[AI Tool] updateJobConfig - jobCode: {}", jobCode);
+            log.info("[AI Tool] updateJobConfig - jobId: {}", jobId);
 
-            Job job = jobService.getByCode(jobCode);
-            if (job == null) {
-                return "修改失败：未找到作业编码为 " + jobCode + " 的作业";
-            }
+            Job job = jobService.getById(jobId);
 
             JobUpdateRequest request = new JobUpdateRequest();
-            request.setJobName(jobName);
+            request.setJobCnName(jobCnName);
             request.setSourceDatabase(sourceDatabase);
             request.setSourceTable(sourceTable);
             request.setTargetDatabase(targetDatabase);
@@ -318,7 +316,7 @@ public class JobTool {
             request.setDescription(description);
 
             jobService.update(job.getId(), request);
-            return String.format("作业 %s 修改成功！", jobCode);
+            return String.format("作业 ID=%d 修改成功！", jobId);
         } catch (BusinessException e) {
             log.error("[AI Tool] updateJobConfig 业务异常", e);
             return "修改失败：" + e.getMessage();
@@ -332,30 +330,27 @@ public class JobTool {
         删除作业。删除指定的作业（需要用户二次确认）。
 
         参数：
-        - jobCode: 作业编码（必填）
+        - jobId: 作业ID（必填）
         - confirmed: 是否已确认（必填，首次调用传false，用户确认后传true）
 
         返回：操作结果描述或确认提示
         """)
     public String deleteJob(
-            @ToolParam(description = "jobCode") String jobCode,
+            @ToolParam(description = "jobId") Long jobId,
             @ToolParam(description = "confirmed") Boolean confirmed
     ) {
         try {
-            log.info("[AI Tool] deleteJob - jobCode: {}, confirmed: {}", jobCode, confirmed);
+            log.info("[AI Tool] deleteJob - jobId: {}, confirmed: {}", jobId, confirmed);
 
-            Job job = jobService.getByCode(jobCode);
-            if (job == null) {
-                return "删除失败：未找到作业编码为 " + jobCode + " 的作业";
-            }
+            Job job = jobService.getById(jobId);
 
             if (confirmed == null || !confirmed) {
-                return String.format("⚠️ 确认删除作业 %s（%s）吗？此操作不可恢复！请回复\"确认\"继续。",
-                        job.getJobCode(), job.getJobName());
+                return String.format("⚠️ 确认删除作业 ID=%d（%s/%s）吗？此操作不可恢复！请回复\"确认\"继续。",
+                        job.getId(), job.getJobName(), job.getJobCnName());
             }
 
             jobService.delete(job.getId());
-            return String.format("作业 %s 已删除", jobCode);
+            return String.format("作业 ID=%d 已删除", jobId);
         } catch (BusinessException e) {
             log.error("[AI Tool] deleteJob 业务异常", e);
             return "删除失败：" + e.getMessage();
@@ -369,32 +364,29 @@ public class JobTool {
         发布作业。将作业的指定版本发布到生产环境（需要用户二次确认）。
 
         参数：
-        - jobCode: 作业编码（必填）
+        - jobId: 作业ID（必填）
         - version: 要发布的版本号（必填）
         - confirmed: 是否已确认（必填，首次调用传false，用户确认后传true）
 
         返回：操作结果描述或确认提示
         """)
     public String publishJob(
-            @ToolParam(description = "jobCode") String jobCode,
+            @ToolParam(description = "jobId") Long jobId,
             @ToolParam(description = "version") Integer version,
             @ToolParam(description = "confirmed") Boolean confirmed
     ) {
         try {
-            log.info("[AI Tool] publishJob - jobCode: {}, version: {}, confirmed: {}", jobCode, version, confirmed);
+            log.info("[AI Tool] publishJob - jobId: {}, version: {}, confirmed: {}", jobId, version, confirmed);
 
-            Job job = jobService.getByCode(jobCode);
-            if (job == null) {
-                return "发布失败：未找到作业编码为 " + jobCode + " 的作业";
-            }
+            Job job = jobService.getById(jobId);
 
             if (confirmed == null || !confirmed) {
-                return String.format("⚠️ 确认发布作业 %s 的版本 %d 吗？发布后将影响生产环境！请回复\"确认\"继续。",
-                        job.getJobCode(), version);
+                return String.format("⚠️ 确认发布作业 ID=%d（%s/%s）的版本 %d 吗？发布后将影响生产环境！请回复\"确认\"继续。",
+                        job.getId(), job.getJobName(), job.getJobCnName(), version);
             }
 
             jobService.publish(job.getId(), version);
-            return String.format("作业 %s 的版本 %d 已发布！", jobCode, version);
+            return String.format("作业 ID=%d 的版本 %d 已发布！", jobId, version);
         } catch (BusinessException e) {
             log.error("[AI Tool] publishJob 业务异常", e);
             return "发布失败：" + e.getMessage();

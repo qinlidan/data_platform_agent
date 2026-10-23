@@ -8,8 +8,8 @@
   >
     <el-steps :active="currentStep" finish-status="success" align-center>
       <el-step title="参数配置" />
-      <el-step title="SQL配置" />
-      <el-step title="字段元数据" />
+      <el-step title="SQL配置与字段元数据" />
+      <el-step title="发布作业" />
     </el-steps>
 
     <div class="step-content">
@@ -21,18 +21,18 @@
           :rules="paramRules"
           label-width="120px"
         >
-          <el-form-item label="作业编码" prop="jobCode">
+          <el-form-item label="作业名称" prop="jobName">
             <el-input
-              v-model="paramForm.jobCode"
-              placeholder="英文字母数字下划线，如：sync_user_data"
+              v-model="paramForm.jobName"
+              placeholder="必须以test_开头，如：test_sync_user_data"
               :disabled="isEdit"
             />
           </el-form-item>
 
-          <el-form-item label="作业名称" prop="jobName">
+          <el-form-item label="作业中文名" prop="jobCnName">
             <el-input
-              v-model="paramForm.jobName"
-              placeholder="请输入作业名称"
+              v-model="paramForm.jobCnName"
+              placeholder="请输入作业中文名"
             />
           </el-form-item>
 
@@ -141,7 +141,8 @@
               <el-form-item label="目标表名" prop="targetTable">
                 <el-input
                   v-model="paramForm.targetTable"
-                  placeholder="请输入目标Hive表名"
+                  placeholder="自动与作业英文名一致"
+                  :disabled="isEdit"
                 />
               </el-form-item>
             </el-col>
@@ -154,36 +155,49 @@
             </el-radio-group>
           </el-form-item>
 
+          <el-form-item label="Spark配置" v-if="paramForm.engineType === 'SPARK'">
+            <el-input
+              v-model="sqlForm.sparkConfig"
+              type="textarea"
+              :rows="5"
+              placeholder="请输入Spark配置（可选，JSON格式）"
+            />
+          </el-form-item>
+
+          <el-form-item label="调度频率" prop="scheduleFrequency">
+            <el-select v-model="paramForm.scheduleFrequency" placeholder="请选择调度频率" clearable>
+              <el-option label="日" value="DAILY" />
+              <el-option label="周" value="WEEKLY" />
+              <el-option label="月" value="MONTHLY" />
+              <el-option label="年" value="YEARLY" />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="是否监控" prop="isMonitored">
+            <el-switch v-model="paramForm.isMonitored" />
+          </el-form-item>
+
           <el-form-item label="作业描述">
             <el-input
               v-model="paramForm.description"
               type="textarea"
               :rows="3"
-              placeholder="请输入作业描述"
+              placeholder="请输入作业描述（选填）"
             />
           </el-form-item>
         </el-form>
       </div>
 
-      <!-- Step 2: SQL配置 -->
+      <!-- Step 2: SQL配置 + 字段元数据 -->
       <div v-show="currentStep === 1" class="step-panel">
         <el-form label-width="120px">
           <el-form-item label="SQL内容">
             <el-input
               v-model="sqlForm.sqlContent"
               type="textarea"
-              :rows="15"
+              :rows="12"
               placeholder="请输入SQL语句"
               style="font-family: 'Consolas', monospace"
-            />
-          </el-form-item>
-
-          <el-form-item label="Spark配置">
-            <el-input
-              v-model="sqlForm.sparkConfig"
-              type="textarea"
-              :rows="5"
-              placeholder="请输入Spark配置（可选，JSON格式）"
             />
           </el-form-item>
 
@@ -207,74 +221,96 @@
               :closable="false"
             />
           </el-form-item>
+
+          <el-divider content-position="left">字段元数据</el-divider>
+
+          <el-form-item>
+            <el-button type="primary" size="small" @click="handleAddField">
+              <el-icon><Plus /></el-icon>
+              添加字段
+            </el-button>
+            <el-button type="success" size="small" @click="handleAutoFill">
+              <el-icon><MagicStick /></el-icon>
+              AI智能填充
+            </el-button>
+          </el-form-item>
+
+          <el-form-item>
+            <el-table :data="fieldList" border stripe style="width: 100%">
+              <el-table-column type="index" label="序号" width="60" />
+              <el-table-column label="字段英文名" width="200">
+                <template #default="{ row }">
+                  <el-input
+                    v-model="row.fieldName"
+                    placeholder="字段英文名"
+                    size="small"
+                  />
+                </template>
+              </el-table-column>
+              <el-table-column label="字段中文名" width="200">
+                <template #default="{ row }">
+                  <el-input
+                    v-model="row.fieldComment"
+                    placeholder="字段中文名"
+                    size="small"
+                  />
+                </template>
+              </el-table-column>
+              <el-table-column label="字段类型" width="150">
+                <template #default="{ row }">
+                  <el-input
+                    v-model="row.fieldType"
+                    placeholder="如：string"
+                    size="small"
+                  />
+                </template>
+              </el-table-column>
+              <el-table-column label="主键" width="80" align="center">
+                <template #default="{ row }">
+                  <el-checkbox v-model="row.isPrimaryKey" />
+                </template>
+              </el-table-column>
+              <el-table-column label="分区键" width="80" align="center">
+                <template #default="{ row }">
+                  <el-checkbox v-model="row.isPartitionKey" />
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="80" align="center">
+                <template #default="{ $index }">
+                  <el-button
+                    type="danger"
+                    size="small"
+                    link
+                    @click="handleDeleteField($index)"
+                  >
+                    删除
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-form-item>
         </el-form>
       </div>
 
-      <!-- Step 3: 字段元数据 -->
+      <!-- Step 3: 发布作业 -->
       <div v-show="currentStep === 2" class="step-panel">
-        <div class="field-header">
-          <el-button type="primary" size="small" @click="handleAddField">
-            <el-icon><Plus /></el-icon>
-            添加字段
-          </el-button>
-          <el-button type="success" size="small" @click="handleAutoFill">
-            <el-icon><MagicStick /></el-icon>
-            AI智能填充
-          </el-button>
-        </div>
-
-        <el-table :data="fieldList" border stripe style="width: 100%">
-          <el-table-column type="index" label="序号" width="60" />
-          <el-table-column label="字段英文名" width="200">
-            <template #default="{ row, $index }">
-              <el-input
-                v-model="row.fieldName"
-                placeholder="字段英文名"
-                size="small"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="字段中文名" width="200">
-            <template #default="{ row, $index }">
-              <el-input
-                v-model="row.fieldComment"
-                placeholder="字段中文名"
-                size="small"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="字段类型" width="150">
-            <template #default="{ row, $index }">
-              <el-input
-                v-model="row.fieldType"
-                placeholder="如：string, int"
-                size="small"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="是否主键" width="100">
-            <template #default="{ row, $index }">
-              <el-checkbox v-model="row.isPrimaryKey" />
-            </template>
-          </el-table-column>
-          <el-table-column label="是否分区键" width="100">
-            <template #default="{ row, $index }">
-              <el-checkbox v-model="row.isPartitionKey" />
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="80" fixed="right">
-            <template #default="{ row, $index }">
-              <el-button
-                link
-                type="danger"
-                size="small"
-                @click="handleDeleteField($index)"
-              >
-                删除
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+        <el-result
+          icon="success"
+          title="作业配置完成"
+          sub-title="确认信息无误后，点击完成按钮发布作业"
+        >
+          <template #extra>
+            <el-descriptions :column="2" border>
+              <el-descriptions-item label="作业英文名">{{ paramForm.jobName }}</el-descriptions-item>
+              <el-descriptions-item label="作业中文名">{{ paramForm.jobCnName }}</el-descriptions-item>
+              <el-descriptions-item label="作业类型">{{ paramForm.jobType }}</el-descriptions-item>
+              <el-descriptions-item label="执行引擎">{{ paramForm.engineType }}</el-descriptions-item>
+              <el-descriptions-item label="源库表">{{ paramForm.sourceDatabase }}.{{ paramForm.sourceTable }}</el-descriptions-item>
+              <el-descriptions-item label="目标库表">{{ paramForm.targetDatabase }}.{{ paramForm.targetTable }}</el-descriptions-item>
+              <el-descriptions-item label="字段数量" :span="2">{{ fieldList.length }} 个</el-descriptions-item>
+            </el-descriptions>
+          </template>
+        </el-result>
       </div>
     </div>
 
@@ -296,7 +332,7 @@
           :loading="publishing"
         >
           <el-icon><Check /></el-icon>
-          保存并发布
+          完成
         </el-button>
       </div>
     </template>
@@ -320,11 +356,35 @@ const visible = ref(false)
 const isEdit = ref(false)
 const currentStep = ref(0)
 
+// 自定义验证器：作业英文名必须以test_开头，只允许英文、数字、下划线
+const validateJobCode = (rule, value, callback) => {
+  if (!value) {
+    callback(new Error('请输入作业英文名'))
+  } else if (!value.startsWith('test_')) {
+    callback(new Error('作业英文名必须以test_开头'))
+  } else if (!/^test_[a-zA-Z0-9_]+$/.test(value)) {
+    callback(new Error('作业英文名只能包含英文、数字和下划线'))
+  } else {
+    callback()
+  }
+}
+
+// 自定义验证器：目标表名只允许英文、数字、下划线
+const validateTargetTable = (rule, value, callback) => {
+  if (!value) {
+    callback(new Error('请输入目标表名'))
+  } else if (!/^[a-zA-Z0-9_]+$/.test(value)) {
+    callback(new Error('目标表名只能包含英文、数字和下划线'))
+  } else {
+    callback()
+  }
+}
+
 // Step 1: 参数表单
 const paramFormRef = ref(null)
 const paramForm = reactive({
-  jobCode: '',
   jobName: '',
+  jobCnName: '',
   jobType: 'DB2HIVE',
   sourceDatasourceId: null,
   sourceDatabase: '',
@@ -332,17 +392,29 @@ const paramForm = reactive({
   targetDatabase: '',
   targetTable: '',
   engineType: 'HIVE',
-  description: ''
+  description: '',
+  scheduleFrequency: null,
+  isMonitored: true
+})
+
+// 监听作业英文名变化，自动填充目标表名（必须在 paramForm 定义之后）
+watch(() => paramForm.jobName, (newVal) => {
+  if (newVal && !isEdit.value) {
+    paramForm.targetTable = newVal
+  }
 })
 
 const paramRules = {
-  jobCode: [{ required: true, message: '请输入作业编码', trigger: 'blur' }],
-  jobName: [{ required: true, message: '请输入作业名称', trigger: 'blur' }],
+  jobName: [{ required: true, validator: validateJobCode, trigger: 'blur' }],
+  jobCnName: [{ required: true, message: '请输入作业中文名', trigger: 'blur' }],
   jobType: [{ required: true, message: '请选择作业类型', trigger: 'change' }],
+  sourceDatasourceId: [{ required: true, message: '请选择源数据源', trigger: 'change' }],
   sourceDatabase: [{ required: true, message: '请选择源数据库', trigger: 'change' }],
   sourceTable: [{ required: true, message: '请选择源表名', trigger: 'change' }],
   targetDatabase: [{ required: true, message: '请输入目标数据库', trigger: 'blur' }],
-  targetTable: [{ required: true, message: '请输入目标表名', trigger: 'blur' }]
+  targetTable: [{ required: true, validator: validateTargetTable, trigger: 'blur' }],
+  engineType: [{ required: true, message: '请选择执行引擎', trigger: 'change' }],
+  isMonitored: [{ required: true, message: '请选择是否监控', trigger: 'change' }]
 }
 
 // Step 2: SQL表单
@@ -437,13 +509,21 @@ const handleDatabaseChange = () => {
   loadTables()
 }
 
-// 表变化时展示字段
+// 表变化时展示字段并自动填充目标表名
 const handleTableChange = (tableName) => {
   const table = tableList.value.find(t => t.tableName === tableName)
   if (table && table.fields) {
     sourceTableFields.value = table.fields
   } else {
     sourceTableFields.value = []
+  }
+
+  // 自动填充目标库名和目标表名
+  if (!paramForm.targetDatabase && paramForm.sourceDatabase) {
+    paramForm.targetDatabase = 'ods_' + paramForm.sourceDatabase
+  }
+  if (!paramForm.targetTable && tableName) {
+    paramForm.targetTable = tableName
   }
 }
 
@@ -468,15 +548,79 @@ watch(visible, (val) => {
 
 // 加载作业详情
 const loadJobDetail = async () => {
-  // TODO: 实现编辑功能
+  try {
+    // 获取作业基础信息
+    const job = await jobApi.getJobDetail(props.jobId)
+
+    // 填充参数表单
+    Object.assign(paramForm, {
+      jobName: job.jobName,
+      jobCnName: job.jobCnName,
+      jobType: job.jobType,
+      sourceDatasourceId: job.sourceDatasourceId,
+      sourceDatabase: job.sourceDatabase,
+      sourceTable: job.sourceTable,
+      targetDatabase: job.targetDatabase,
+      targetTable: job.targetTable,
+      engineType: job.engineType || 'HIVE',
+      description: job.description || '',
+      scheduleFrequency: job.scheduleFrequency || null,
+      isMonitored: job.isMonitored !== undefined ? job.isMonitored : true
+    })
+
+    // 记录 jobId 和当前版本ID
+    createdJobId.value = job.id
+    createdVersionId.value = job.currentVersion
+
+    // 如果有数据源，加载库列表和表列表
+    if (job.sourceDatasourceId) {
+      await loadDatabases()
+      if (job.sourceDatabase) {
+        await loadTables()
+        // 如果有表名，触发表选择以加载字段
+        if (job.sourceTable) {
+          handleTableChange(job.sourceTable)
+        }
+      }
+    }
+
+    // 获取当前版本详情
+    if (job.currentVersion) {
+      const version = await jobVersionApi.getVersionDetail(job.currentVersion)
+
+      // 填充SQL表单
+      if (version.sqlContent) {
+        sqlForm.sqlContent = version.sqlContent
+        sqlForm.sparkConfig = version.sparkConfig || ''
+      }
+
+      // 获取字段元数据
+      const fields = await fieldMetadataApi.getFieldList(job.currentVersion)
+      if (fields && fields.length > 0) {
+        fieldList.value = fields.map(f => ({
+          fieldName: f.fieldName,
+          fieldComment: f.fieldComment,
+          fieldType: f.fieldType,
+          isPrimaryKey: f.isPrimaryKey || false,
+          isPartitionKey: f.isPartitionKey || false
+        }))
+      }
+    }
+
+    ElMessage.success('作业详情加载成功')
+  } catch (error) {
+    console.error('加载作业详情失败', error)
+    ElMessage.error('加载作业详情失败')
+    handleClose()
+  }
 }
 
 // 重置表单
 const resetForm = () => {
   currentStep.value = 0
   Object.assign(paramForm, {
-    jobCode: '',
     jobName: '',
+    jobCnName: '',
     jobType: 'DB2HIVE',
     sourceDatasourceId: null,
     sourceDatabase: '',
@@ -530,6 +674,12 @@ const handleNext = async () => {
       return
     }
 
+    // 验证字段元数据
+    if (fieldList.value.length === 0) {
+      ElMessage.warning('请至少添加一个字段')
+      return
+    }
+
     // 保存SQL配置
     try {
       await jobVersionApi.configureSql(createdJobId.value, {
@@ -537,7 +687,11 @@ const handleNext = async () => {
         sparkConfig: sqlForm.sparkConfig,
         changeLog: sqlForm.changeLog || '配置SQL'
       })
-      ElMessage.success('SQL配置保存成功')
+
+      // 保存字段元数据
+      await fieldMetadataApi.saveFields(createdVersionId.value, fieldList.value)
+
+      ElMessage.success('SQL配置和字段元数据保存成功')
     } catch (error) {
       return
     }
@@ -638,27 +792,11 @@ const handleAutoFill = async () => {
   }
 }
 
-// 保存并发布
+// 发布作业
 const publishing = ref(false)
 const handlePublish = async () => {
-  if (fieldList.value.length === 0) {
-    ElMessage.warning('请至少添加一个字段')
-    return
-  }
-
-  // 验证字段
-  for (const field of fieldList.value) {
-    if (!field.fieldName || !field.fieldComment) {
-      ElMessage.warning('请完善所有字段的英文名和中文名')
-      return
-    }
-  }
-
   publishing.value = true
   try {
-    // 保存字段元数据
-    await fieldMetadataApi.saveFields(createdVersionId.value, fieldList.value)
-
     // 发布版本
     await jobVersionApi.publishVersion(createdVersionId.value)
 

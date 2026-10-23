@@ -49,6 +49,7 @@ log/
 *.sql
 !deploy/mysql/init.sql
 !src/main/resources/db/schema.sql
+!src/main/resources/db/migration/*.sql
 
 # Docker volumes data
 mysql_data/

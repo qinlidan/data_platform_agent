@@ -2,6 +2,8 @@ package com.dataplatform.controller;
 
 import com.dataplatform.common.ApiResponse;
 import com.dataplatform.dto.SqlConfigRequest;
+import com.dataplatform.dto.version.RollbackRequest;
+import com.dataplatform.dto.version.RollbackResult;
 import com.dataplatform.entity.JobVersion;
 import com.dataplatform.service.JobVersionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -54,5 +56,16 @@ public class JobVersionController {
     public ApiResponse<Void> delete(@PathVariable Long id) {
         jobVersionService.delete(id);
         return ApiResponse.success();
+    }
+
+    @Operation(summary = "版本回滚")
+    @PostMapping("/rollback")
+    public ApiResponse<RollbackResult> rollback(@Valid @RequestBody RollbackRequest request) {
+        RollbackResult result = jobVersionService.rollback(request);
+        if (result.isSuccess()) {
+            return ApiResponse.success(result);
+        } else {
+            return ApiResponse.error(result.getResultCode(), result.getResultMsg(), result);
+        }
     }
 }

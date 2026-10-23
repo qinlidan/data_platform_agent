@@ -94,8 +94,8 @@
         style="width: 100%"
       >
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="jobCode" label="作业编码" width="180" />
-        <el-table-column prop="jobName" label="作业名称" width="200" />
+        <el-table-column prop="jobName" label="作业名称" width="180" />
+        <el-table-column prop="jobCnName" label="作业中文名" width="200" />
         <el-table-column prop="jobType" label="作业类型" width="120">
           <template #default="{ row }">
             <el-tag :type="row.jobType === 'DB2HIVE' ? 'primary' : 'success'">
@@ -103,16 +103,27 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="数据源" width="250">
+        <el-table-column label="源数据源" width="150">
           <template #default="{ row }">
-            <div class="source-info">
-              <div>{{ row.sourceDatabase }}.{{ row.sourceTable }}</div>
-              <el-icon><Right /></el-icon>
-              <div>{{ row.targetDatabase }}.{{ row.targetTable }}</div>
-            </div>
+            {{ getDatasourceName(row.sourceDatasourceId) }}
           </template>
         </el-table-column>
+        <el-table-column prop="sourceDatabase" label="源库名" width="150" />
+        <el-table-column prop="sourceTable" label="源表名" width="150" />
+        <el-table-column prop="targetDatabase" label="目标库名" width="150" />
         <el-table-column prop="engineType" label="执行引擎" width="100" />
+        <el-table-column prop="scheduleFrequency" label="调度频率" width="100">
+          <template #default="{ row }">
+            {{ frequencyMap[row.scheduleFrequency] || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="isMonitored" label="是否监控" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.isMonitored ? 'success' : 'info'">
+              {{ row.isMonitored ? '是' : '否' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
             <el-tag
@@ -125,8 +136,16 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="currentVersion" label="当前版本" width="100" />
-        <el-table-column prop="publishedVersion" label="发布版本" width="100" />
+        <el-table-column label="当前版本" width="100">
+          <template #default="{ row }">
+            {{ row.currentVersion ? 'v' + row.currentVersion : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="发布版本" width="100">
+          <template #default="{ row }">
+            {{ row.publishedVersion ? 'v' + row.publishedVersion : '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="180" />
         <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
@@ -224,12 +243,29 @@
             </div>
 
             <div class="message-content">
+              <!-- 工具调用徽章 -->
+              <div v-if="msg.toolCalls && msg.toolCalls.length > 0" class="tool-badges">
+                <el-tag
+                  v-for="(tool, idx) in msg.toolCalls"
+                  :key="idx"
+                  :type="tool.status === 'running' ? 'warning' : tool.status === 'completed' ? 'success' : 'danger'"
+                  size="small"
+                  effect="plain"
+                  style="margin-right: 6px; margin-bottom: 6px;"
+                >
+                  <el-icon style="vertical-align: middle; margin-right: 4px;">
+                    <Tools />
+                  </el-icon>
+                  {{ getToolLabel(tool.toolName) }}
+                </el-tag>
+              </div>
+
               <!-- 作业列表表格渲染 -->
               <div v-if="msg.isJobList && msg.jobListData" class="job-list-table">
                 <div class="job-list-summary">{{ msg.jobListData.summary }}</div>
                 <el-table :data="msg.jobListData.data" size="small" stripe border style="margin-top: 8px;">
-                  <el-table-column prop="jobCode" label="作业编码" width="140" />
-                  <el-table-column prop="jobName" label="作业名称" width="120" />
+                  <el-table-column prop="jobName" label="作业英文名" width="140" />
+                  <el-table-column prop="jobCnName" label="作业中文名" width="120" />
                   <el-table-column prop="jobType" label="类型" width="90">
                     <template #default="{ row }">
                       <el-tag :type="row.jobType === 'DB2HIVE' ? 'primary' : 'success'" size="small">
@@ -315,7 +351,7 @@
 import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Right, ChatDotRound, User } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Right, ChatDotRound, User, Tools } from '@element-plus/icons-vue'
 import { jobApi } from '@/api'
 import request from '@/utils/request'
 import JobCreateDialog from './JobCreateDialog.vue'
@@ -358,6 +394,20 @@ const statusMap = {
   ARCHIVED: '已归档'
 }
 
+const frequencyMap = {
+  DAILY: '日',
+  WEEKLY: '周',
+  MONTHLY: '月',
+  YEARLY: '年'
+}
+
+// 根据数据源ID获取数据源名称
+const getDatasourceName = (id) => {
+  if (!id) return '-'
+  const ds = datasourceList.value.find(d => d.id === id)
+  return ds ? ds.sourceName : '-'
+}
+
 // 获取列表
 const getList = async () => {
   loading.value = true
@@ -387,7 +437,8 @@ const getList = async () => {
 const loadDatasources = async () => {
   try {
     const res = await request.get('/datasources/all')
-    datasourceList.value = res.data || []
+    datasourceList.value = res || []
+    console.log('数据源列表:', datasourceList.value)
   } catch (error) {
     console.error('加载数据源失败', error)
   }
@@ -546,35 +597,36 @@ const sendMessage = async () => {
   aiLoading.value = true
 
   // 创建临时消息对象（流式追加内容）
-  const assistantMessage = {
+  const assistantMessage = reactive({
     role: 'assistant',
     content: '',
     isJobList: false,
-    jobListData: null
-  }
+    jobListData: null,
+    toolCalls: [] // 新增：记录工具调用轨迹
+  })
   messages.value.push(assistantMessage)
 
 
   try {
-    console.log('🚀 使用 EventSource 建立 SSE 连接')
+    console.log('使用 EventSource 建立 SSE 连接')
     // 使用 EventSource 建立 SSE 连接
      eventSource = new EventSource(
       `/api/ai/chat/stream?message=${encodeURIComponent(userMessage)}`
     )
 
-    // ✅ 添加：监听连接打开事件
+    //  添加：监听连接打开事件
     eventSource.onopen = (e) => {
       console.log('✅ SSE 连接已建立', e)
     }
 
-    // ✅ 添加：监听默认 message 事件（调试用）
+    // 添加：监听默认 message 事件（调试用）
     eventSource.onmessage = (e) => {
-      console.warn('⚠️ 收到默认 message 事件（不应该出现）:', e.data)
+      console.warn('收到默认 message 事件（不应该出现）:', e.data)
     }
 
     // 监听 text 事件：逐字追加文本
     eventSource.addEventListener('text', (e) => {
-      console.log('📝 收到 text 分片', new Date().toISOString(), e.data)
+      console.log('收到 text 分片', new Date().toISOString(), e.data)
       try {
         const data = JSON.parse(e.data)
         assistantMessage.content += data.content || ''
@@ -590,12 +642,39 @@ const sendMessage = async () => {
 
     // 监听 done 事件：流结束
     eventSource.addEventListener('done', (e) => {
-      console.log('✅ 收到 done 事件，流结束')
-      isFinished = true; // ✅ 标记：正常结束
+      console.log('收到 done 事件，流结束')
+      isFinished = true; //  标记：正常结束
       eventSource.close()
       aiLoading.value = false
       scrollToBottom()
       getList() // 刷新作业列表
+    })
+
+    // 监听 tool_start 事件：工具调用开始
+    eventSource.addEventListener('tool_start', (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        console.log('工具调用开始:', data)
+
+        // 添加工具调用记录
+        assistantMessage.toolCalls.push({
+          toolName: data.toolName,
+          toolId: data.toolId,
+          arguments: data.arguments,
+          status: 'running', // running | completed | failed
+          startTime: data.timestamp
+        })
+
+        // 在消息内容前添加工具调用提示
+        const toolLabel = getToolLabel(data.toolName)
+        assistantMessage.content = `🔧 正在调用：${toolLabel}\n\n`
+
+        nextTick(() => {
+          scrollToBottom()
+        })
+      } catch (err) {
+        console.error('解析 tool_start 事件失败:', err)
+      }
     })
 
     // 监听 table_start 事件：开始接收表格数据
@@ -642,7 +721,7 @@ eventSource.onerror = (error) => {
 
   // ✅ 关键修复：如果已经收到 done 事件，说明是正常结束，不报错
   if (isFinished) {
-    console.log("✅ SSE 流式消息接收完毕，后端关闭连接（正常结束）")
+    console.log("SSE 流式消息接收完毕，后端关闭连接（正常结束）")
     return; // 直接返回，不弹错误提示
   }
 
@@ -666,6 +745,22 @@ eventSource.onerror = (error) => {
 // 清空消息
 const clearMessages = () => {
   messages.value = []
+}
+
+// 工具名称映射（中文描述）
+const getToolLabel = (toolName) => {
+  const toolLabels = {
+    'getJobDetails': '查询作业详情',
+    'listRecentJobs': '查询最近作业',
+    'searchJobs': '搜索作业',
+    'createJob': '创建作业',
+    'updateJobConfig': '修改作业',
+    'deleteJob': '删除作业',
+    'publishJob': '发布作业',
+    'listDataSources': '查询数据源',
+    'getDataSourceByCode': '查询数据源详情'
+  }
+  return toolLabels[toolName] || toolName
 }
 
 // 格式化消息（支持换行和简单的 Markdown）
@@ -804,6 +899,10 @@ const scrollToBottom = () => {
   font-size: 12px;
 }
 
+.tool-badges {
+  margin-bottom: 8px;
+}
+
 .chat-input-area {
   border-top: 1px solid #dcdfe6;
   padding-top: 12px;
@@ -818,13 +917,6 @@ const scrollToBottom = () => {
 
 .search-card {
   margin-bottom: 16px;
-}
-
-.source-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
 }
 
 .pagination {

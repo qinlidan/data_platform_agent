@@ -9,6 +9,7 @@ import com.dataplatform.entity.Job;
 import com.dataplatform.entity.JobVersion;
 import com.dataplatform.enums.JobStatus;
 import com.dataplatform.enums.JobType;
+import com.dataplatform.enums.VersionStatus;
 import com.dataplatform.exception.BusinessException;
 import com.dataplatform.mapper.JobMapper;
 import com.dataplatform.mapper.JobVersionMapper;
@@ -38,11 +39,11 @@ public class JobServiceImpl implements JobService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Job create(JobCreateRequest request) {
-        // 检查作业编码是否重复
+        // 检查作业名称是否重复
         LambdaQueryWrapper<Job> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Job::getJobCode, request.getJobCode());
+        wrapper.eq(Job::getJobName, request.getJobName());
         if (jobMapper.selectCount(wrapper) > 0) {
-            throw new BusinessException("作业编码已存在");
+            throw new BusinessException("作业名称已存在");
         }
 
         // 校验数据源：DB2HIVE 必须选择源数据源
@@ -53,6 +54,16 @@ public class JobServiceImpl implements JobService {
         // 检查数据源是否存在（HIVE2HIVE 无源数据源）
         if (request.getSourceDatasourceId() != null) {
             dataSourceService.getById(request.getSourceDatasourceId());
+        }
+
+        // 如果目标表名为空，自动设置为作业名称
+        if (request.getTargetTable() == null || request.getTargetTable().trim().isEmpty()) {
+            request.setTargetTable(request.getJobName());
+        }
+
+        // 如果monitored为空，默认设置为true
+        if (request.getMonitored() == null) {
+            request.setMonitored(true);
         }
 
         // 创建作业
@@ -68,8 +79,11 @@ public class JobServiceImpl implements JobService {
         JobVersion version = new JobVersion();
         version.setJobId(job.getId());
         version.setVersion(1);
-        version.setIsPublished(0);
+        version.setStatus(VersionStatus.DRAFT);
         version.setChangeLog("初始版本");
+        // 复制调度频率和监控状态到版本
+        version.setScheduleFrequency(job.getScheduleFrequency());
+        version.setMonitored(job.getMonitored());
         jobVersionMapper.insert(version);
 
         // 更新作业当前版本
@@ -96,8 +110,8 @@ public class JobServiceImpl implements JobService {
         }
 
         // 更新作业
-        if (request.getJobName() != null) {
-            job.setJobName(request.getJobName());
+        if (request.getJobCnName() != null) {
+            job.setJobCnName(request.getJobCnName());
         }
         if (request.getJobType() != null) {
             job.setJobType(request.getJobType());
@@ -122,6 +136,12 @@ public class JobServiceImpl implements JobService {
         }
         if (request.getDescription() != null) {
             job.setDescription(request.getDescription());
+        }
+        if (request.getScheduleFrequency() != null) {
+            job.setScheduleFrequency(request.getScheduleFrequency());
+        }
+        if (request.getMonitored() != null) {
+            job.setMonitored(request.getMonitored());
         }
 
         jobMapper.updateById(job);
@@ -164,13 +184,6 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
-    public Job getByCode(String jobCode) {
-        LambdaQueryWrapper<Job> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Job::getJobCode, jobCode);
-        return jobMapper.selectOne(wrapper);
-    }
-
-    @Override
     public Page<Job> page(JobQueryRequest request) {
         int pageNum = request.getPageNum() != null ? request.getPageNum() : 1;
         int pageSize = request.getPageSize() != null ? request.getPageSize() : 10;
@@ -180,9 +193,9 @@ public class JobServiceImpl implements JobService {
 
         // 关键词搜索
         if (StringUtils.hasText(request.getKeyword())) {
-            wrapper.and(w -> w.like(Job::getJobCode, request.getKeyword())
+            wrapper.and(w -> w.like(Job::getJobName, request.getKeyword())
                              .or()
-                             .like(Job::getJobName, request.getKeyword()));
+                             .like(Job::getJobCnName, request.getKeyword()));
         }
 
         // 作业类型筛选
@@ -247,15 +260,15 @@ public class JobServiceImpl implements JobService {
         // 取消之前的发布版本
         LambdaQueryWrapper<JobVersion> publishedWrapper = new LambdaQueryWrapper<>();
         publishedWrapper.eq(JobVersion::getJobId, id)
-                       .eq(JobVersion::getIsPublished, 1);
+                       .eq(JobVersion::getStatus, VersionStatus.PUBLISHED);
         List<JobVersion> publishedVersions = jobVersionMapper.selectList(publishedWrapper);
         for (JobVersion pv : publishedVersions) {
-            pv.setIsPublished(0);
+            pv.setStatus(VersionStatus.DRAFT);
             jobVersionMapper.updateById(pv);
         }
 
         // 发布当前版本
-        jobVersion.setIsPublished(1);
+        jobVersion.setStatus(VersionStatus.PUBLISHED);
         jobVersionMapper.updateById(jobVersion);
 
         // 更新作业状态

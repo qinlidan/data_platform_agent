@@ -23,15 +23,15 @@
             :rules="paramRules"
             label-width="120px"
           >
-            <el-form-item label="作业英文名" prop="jobCode">
+            <el-form-item label="作业英文名" prop="jobName">
               <el-input
-                v-model="paramForm.jobCode"
+                v-model="paramForm.jobName"
                 placeholder="请输入作业英文名"
               />
             </el-form-item>
 
-            <el-form-item label="作业名称" prop="jobName">
-              <el-input v-model="paramForm.jobName" placeholder="请输入作业名称" />
+            <el-form-item label="作业中文名" prop="jobCnName">
+              <el-input v-model="paramForm.jobCnName" placeholder="请输入作业中文名" />
             </el-form-item>
 
             <el-form-item label="作业描述">
@@ -281,8 +281,8 @@ const currentStep = ref(0)
 // Step 1: 参数表单
 const paramFormRef = ref(null)
 const paramForm = reactive({
-  jobCode: '',
   jobName: '',
+  jobCnName: '',
   jobType,
   sourceDatasourceId,
   sourceDatabase: '',
@@ -295,8 +295,8 @@ const paramForm = reactive({
 })
 
 const paramRules = {
-  jobCode: [{ required: true, message: '请输入作业编码', trigger: 'blur' }],
-  jobName: [{ required: true, message: '请输入作业名称', trigger: 'blur' }],
+  jobName: [{ required: true, message: '请输入作业英文名', trigger: 'blur' }],
+  jobCnName: [{ required: true, message: '请输入作业中文名', trigger: 'blur' }],
   sourceDatabase: [{ required: true, message: '请输入源数据库', trigger: 'blur' }],
   sourceTable: [{ required: true, message: '请输入源表名', trigger: 'blur' }],
   targetDatabase: [{ required: true, message: '请输入目标数据库', trigger: 'blur' }],
@@ -304,7 +304,7 @@ const paramRules = {
 }
 
 // 目标表名 = 作业英文名（自动同步）
-watch(() => paramForm.jobCode, (val) => {
+watch(() => paramForm.jobName, (val) => {
   paramForm.targetTable = val
 })
 

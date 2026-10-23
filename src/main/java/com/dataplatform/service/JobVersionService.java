@@ -1,6 +1,8 @@
 package com.dataplatform.service;
 
 import com.dataplatform.dto.SqlConfigRequest;
+import com.dataplatform.dto.version.RollbackRequest;
+import com.dataplatform.dto.version.RollbackResult;
 import com.dataplatform.entity.JobVersion;
 
 import java.util.List;
@@ -34,4 +36,12 @@ public interface JobVersionService {
      * 删除版本
      */
     void delete(Long id);
+
+    /**
+     * 版本回滚
+     *
+     * @param request 回滚请求
+     * @return 回滚结果
+     */
+    RollbackResult rollback(RollbackRequest request);
 }

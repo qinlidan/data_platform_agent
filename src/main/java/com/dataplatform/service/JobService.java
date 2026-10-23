@@ -32,11 +32,6 @@ public interface JobService {
     Job getById(Long id);
 
     /**
-     * 根据作业编码查询作业
-     */
-    Job getByCode(String jobCode);
-
-    /**
      * 分页查询作业列表
      */
     Page<Job> page(JobQueryRequest request);
