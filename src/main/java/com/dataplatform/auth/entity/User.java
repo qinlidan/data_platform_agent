@@ -9,15 +9,15 @@ import java.time.LocalDateTime;
 public class User {
     @TableId(type = IdType.AUTO)
     private Long id;
-
+    
     private String email;
     private String password;
     private LocalDateTime lastVerifiedAt;
     private Integer status;
-
+    
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
-
+    
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 }
