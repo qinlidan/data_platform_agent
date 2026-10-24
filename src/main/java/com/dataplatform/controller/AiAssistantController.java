@@ -2,8 +2,10 @@ package com.dataplatform.controller;
 
 import com.dataplatform.ai.ToolMonitorConfig;
 import com.dataplatform.ai.tools.DataSourceTool;
+import com.dataplatform.ai.tools.FaqTool;
 import com.dataplatform.ai.tools.JobTool;
 import com.dataplatform.common.ApiResponse;
+import com.dataplatform.mapper.FaqMapper;
 import com.dataplatform.service.DataSourceService;
 import com.dataplatform.service.JobService;
 import com.dataplatform.util.SqlParserUtil;
@@ -45,6 +47,7 @@ public class AiAssistantController {
     private final ChatModel chatModel;
     private final JobService jobService;
     private final DataSourceService dataSourceService;
+    private final FaqMapper faqMapper;
     private final ChatMemory chatMemory;
     private final SystemPromptTemplate pureConversationSystemPrompt;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -53,12 +56,14 @@ public class AiAssistantController {
             ChatModel chatModel,
             JobService jobService,
             DataSourceService dataSourceService,
+            FaqMapper faqMapper,
             ChatMemory chatMemory,
             @Qualifier("pureConversationSystemPrompt") SystemPromptTemplate pureConversationSystemPrompt
     ) {
         this.chatModel = chatModel;
         this.jobService = jobService;
         this.dataSourceService = dataSourceService;
+        this.faqMapper = faqMapper;
         this.chatMemory = chatMemory;
         this.pureConversationSystemPrompt = pureConversationSystemPrompt;
     }
@@ -123,9 +128,10 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(@RequestParam Strin
         JobTool jobTool = new JobTool(jobService, dataSourceService);
         jobTool.setUiEventSink(uiEventSink);
         DataSourceTool dataSourceTool = new DataSourceTool(dataSourceService);
+        FaqTool faqTool = new FaqTool(faqMapper);
 
         // 使用工厂方法包装工具（装饰器模式）
-        ToolCallback[] monitoredTools = ToolMonitorConfig.wrapTools(uiEventSink, jobTool, dataSourceTool);
+        ToolCallback[] monitoredTools = ToolMonitorConfig.wrapTools(uiEventSink, jobTool, dataSourceTool, faqTool);
 
         // 使用 ChatClient.Builder，传入包装后的工具回调
         ChatClient chatClient = ChatClient.builder(chatModel)
@@ -306,6 +312,10 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(@RequestParam Strin
             12. updateDataSource - 修改数据源配置（参数：datasourceId、sourceName、jdbcUrl、username、password、description）
             13. deleteDataSource - 删除数据源（参数：datasourceId、confirmed）
             14. testDataSourceConnection - 测试数据源连接（参数：datasourceId）
+
+            【FAQ知识库工具】
+            15. queryFaq - 查询常见问题知识库（参数：keyword、category）
+               用于查询故障诊断、性能优化等常见问题的答案
 
             重要规则：
             1. 创建作业时，如果用户没有提供作业编码，自动生成一个（格式：job_表名_序号）。
