@@ -18,7 +18,7 @@ public class VerificationCodeService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int CODE_LENGTH = 6;
-    private static final long CODE_EXPIRE_MINUTES = 5;
+    private static final long CODE_EXPIRE_MINUTES = 10;
     private static final long SEND_INTERVAL_SECONDS = 60;
 
     /**

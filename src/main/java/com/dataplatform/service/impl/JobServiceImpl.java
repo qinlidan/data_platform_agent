@@ -71,7 +71,6 @@ public class JobServiceImpl implements JobService {
         BeanUtils.copyProperties(request, job);
         job.setStatus(JobStatus.DRAFT);
         job.setCurrentVersion(0);
-        job.setPublishedVersion(0);
 
         jobMapper.insert(job);
 
@@ -191,21 +190,14 @@ public class JobServiceImpl implements JobService {
         Page<Job> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Job> wrapper = new LambdaQueryWrapper<>();
 
-        // 关键词搜索
-        if (StringUtils.hasText(request.getKeyword())) {
-            wrapper.and(w -> w.like(Job::getJobName, request.getKeyword())
-                             .or()
-                             .like(Job::getJobCnName, request.getKeyword()));
-        }
-
         // 作业类型筛选
-        if (StringUtils.hasText(request.getJobType())) {
-            wrapper.eq(Job::getJobType, JobType.valueOf(request.getJobType()));
+        if (request.getJobType() != null) {
+            wrapper.eq(Job::getJobType, request.getJobType());
         }
 
         // 作业状态筛选
-        if (StringUtils.hasText(request.getStatus())) {
-            wrapper.eq(Job::getStatus, JobStatus.valueOf(request.getStatus()));
+        if (request.getStatus() != null) {
+            wrapper.eq(Job::getStatus, request.getStatus());
         }
 
         // 源数据源ID筛选
@@ -224,7 +216,7 @@ public class JobServiceImpl implements JobService {
         }
 
         // 作业频率筛选
-        if (StringUtils.hasText(request.getScheduleFrequency())) {
+        if (request.getScheduleFrequency() != null) {
             wrapper.eq(Job::getScheduleFrequency, request.getScheduleFrequency());
         }
 
@@ -273,7 +265,6 @@ public class JobServiceImpl implements JobService {
 
         // 更新作业状态
         job.setStatus(JobStatus.PUBLISHED);
-        job.setPublishedVersion(version);
         jobMapper.updateById(job);
     }
 

@@ -46,6 +46,7 @@ public class EmailService {
         return switch (type) {
             case REGISTER -> "【数据平台】注册验证码";
             case LOGIN -> "【数据平台】登录验证码";
+            case RESET_PASSWORD -> "【数据平台】重置密码验证码";
         };
     }
 
@@ -53,6 +54,7 @@ public class EmailService {
         String action = switch (type) {
             case REGISTER -> "注册数据平台账号";
             case LOGIN -> "登录数据平台";
+            case RESET_PASSWORD -> "重置密码";
         };
 
         return String.format("""

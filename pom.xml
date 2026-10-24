@@ -25,6 +25,7 @@
         <springdoc.version>2.3.0</springdoc.version>
         <jsqlparser.version>4.6</jsqlparser.version>
         <spring-ai.version>1.0.3</spring-ai.version>
+        <langgraph4j.version>1.9.6</langgraph4j.version>
     </properties>
 
     <!-- Spring AI 1.0.3 (最新稳定版) 已经发布到Maven中央仓库 -->
@@ -50,6 +51,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- AspectJ for AOP -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
         <!-- ========== 这里是修改点：替换为SpringAI 1.0 GA新artifactId ========== -->
@@ -186,6 +193,13 @@
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
+        </dependency>
+
+        <!-- LangGraph4j - AI Agent Workflow -->
+        <dependency>
+            <groupId>org.bsc.langgraph4j</groupId>
+            <artifactId>langgraph4j-core</artifactId>
+            <version>${langgraph4j.version}</version>
         </dependency>
     </dependencies>
 

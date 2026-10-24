@@ -1,5 +1,8 @@
 package com.dataplatform.dto;
 
+import com.dataplatform.enums.JobStatus;
+import com.dataplatform.enums.JobType;
+import com.dataplatform.enums.ScheduleFrequency;
 import lombok.Data;
 
 /**
@@ -19,19 +22,14 @@ public class JobQueryRequest {
     private Integer pageSize = 10;
 
     /**
-     * 搜索关键词（作业编码或名称）
-     */
-    private String keyword;
-
-    /**
      * 作业类型：DB2HIVE、HIVE2HIVE
      */
-    private String jobType;
+    private JobType jobType;
 
     /**
      * 作业状态：DRAFT、PUBLISHED、ARCHIVED
      */
-    private String status;
+    private JobStatus status;
 
     /**
      * 源数据源ID
@@ -49,7 +47,7 @@ public class JobQueryRequest {
     private String sourceTable;
 
     /**
-     * 作业频率
+     * 调度频率：DAILY、WEEKLY、MONTHLY、YEARLY
      */
-    private String scheduleFrequency;
+    private ScheduleFrequency scheduleFrequency;
 }

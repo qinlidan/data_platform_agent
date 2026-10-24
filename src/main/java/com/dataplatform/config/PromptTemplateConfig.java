@@ -18,7 +18,7 @@ public class PromptTemplateConfig {
     @Bean("pureConversationSystemPrompt")
     public SystemPromptTemplate pureConversationSystemPrompt() {
         return new SystemPromptTemplate("""
-            你是数据平台的 AI 助手，专门帮助用户管理 ETL 作业和数据源。
+            你是数据研发平台的 AI 助手，专门帮助用户管理 ETL 作业和数据源。
 
             当前是纯对话模式，你无法直接操作系统，只能：
             1. 解答用户关于作业管理、数据源配置、调度策略的问题

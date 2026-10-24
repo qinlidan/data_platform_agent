@@ -5,15 +5,6 @@
       <!-- 搜索区域 -->
       <el-card class="search-card" shadow="never">
       <el-form :model="searchForm" :inline="true">
-        <el-form-item label="作业名称">
-          <el-input
-            v-model="searchForm.keyword"
-            placeholder="请输入作业编码或名称"
-            clearable
-            style="width: 200px"
-          />
-        </el-form-item>
-
         <el-form-item label="作业状态">
           <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 150px">
             <el-option label="草稿" value="DRAFT" />
@@ -59,12 +50,12 @@
         </el-form-item>
 
         <el-form-item label="作业频率">
-          <el-input
-            v-model="searchForm.scheduleFrequency"
-            placeholder="请输入作业频率"
-            clearable
-            style="width: 150px"
-          />
+          <el-select v-model="searchForm.scheduleFrequency" placeholder="请选择" clearable style="width: 150px">
+            <el-option label="日" value="DAILY" />
+            <el-option label="周" value="WEEKLY" />
+            <el-option label="月" value="MONTHLY" />
+            <el-option label="年" value="YEARLY" />
+          </el-select>
         </el-form-item>
 
         <el-form-item>
@@ -139,11 +130,6 @@
         <el-table-column label="当前版本" width="100">
           <template #default="{ row }">
             {{ row.currentVersion ? 'v' + row.currentVersion : '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="发布版本" width="100">
-          <template #default="{ row }">
-            {{ row.publishedVersion ? 'v' + row.publishedVersion : '-' }}
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="180" />
@@ -359,7 +345,6 @@ import JobTypeDialog from './JobTypeDialog.vue'
 
 // 搜索表单
 const searchForm = reactive({
-  keyword: '',
   status: '',
   jobType: '',
   sourceDatasourceId: null,
@@ -452,7 +437,6 @@ const handleSearch = () => {
 
 // 重置
 const handleReset = () => {
-  searchForm.keyword = ''
   searchForm.status = ''
   searchForm.jobType = ''
   searchForm.sourceDatasourceId = null

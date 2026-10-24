@@ -1,7 +1,7 @@
 package com.dataplatform.security;
 
+import com.dataplatform.auth.util.JwtUtil;
 import com.dataplatform.common.Constants;
-import com.dataplatform.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,10 +40,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // 验证Token并设置认证信息
             if (StringUtils.hasText(token) && jwtUtil.validateToken(token)) {
-                String username = jwtUtil.getUsernameFromToken(token);
+                String email = jwtUtil.getEmailFromToken(token);
 
                 // 加载用户信息
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
                 // 创建认证对象
                 UsernamePasswordAuthenticationToken authentication =

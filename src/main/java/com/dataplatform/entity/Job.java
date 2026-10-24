@@ -17,10 +17,9 @@ import java.time.LocalDateTime;
  *
  * <p>版本管理说明：
  * - currentVersion：最新版本号（可能是草稿）
- * - publishedVersion：已发布版本号（历史兼容字段）
  * - onlineVersion：线上运行版本号，只在新创建、发布、回滚时更新
- * - 草稿态：publishedVersion = NULL 或 currentVersion > publishedVersion
- * - 已发布：publishedVersion = currentVersion
+ * - 草稿态：currentVersion > onlineVersion
+ * - 已发布：currentVersion = onlineVersion
  */
 @Data
 @TableName("etl_job")
@@ -62,11 +61,6 @@ public class Job {
      * 当前版本号（最新版本，可能是草稿）
      */
     private Integer currentVersion;
-
-    /**
-     * 已发布版本号（线上运行版本，NULL表示从未发布）
-     */
-    private Integer publishedVersion;
 
     /**
      * 线上运行版本号（只在新创建、发布、回滚时更新）
@@ -118,23 +112,23 @@ public class Job {
      * 判断是否有未发布的变更
      */
     public boolean hasPendingChanges() {
-        if (publishedVersion == null) {
+        if (onlineVersion == null) {
             return currentVersion != null && currentVersion > 0;
         }
-        return currentVersion != null && currentVersion > publishedVersion;
+        return currentVersion != null && currentVersion > onlineVersion;
     }
 
     /**
      * 判断是否从未发布过
      */
     public boolean isNeverPublished() {
-        return publishedVersion == null;
+        return onlineVersion == null;
     }
 
     /**
      * 判断是否已发布
      */
     public boolean isPublished() {
-        return publishedVersion != null && publishedVersion.equals(currentVersion);
+        return onlineVersion != null && onlineVersion.equals(currentVersion);
     }
 }

@@ -1,6 +1,7 @@
 package com.dataplatform.controller;
 
 import com.dataplatform.ai.ToolMonitorConfig;
+import com.dataplatform.ai.confirmation.NeedConfirmationException;
 import com.dataplatform.ai.tools.DataSourceTool;
 import com.dataplatform.ai.tools.FaqTool;
 import com.dataplatform.ai.tools.JobTool;
@@ -183,6 +184,17 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(@RequestParam Strin
                             .data(Map.of("message", "AI对话失败：" + e.getMessage()))
                             .build());
                 });
+    } catch (NeedConfirmationException e) {
+        log.warn("[Confirmation Required] {}", e.getMessage());
+        return Flux.just(ServerSentEvent.<Map<String, Object>>builder()
+                .event("confirmation_required")
+                .data(Map.of(
+                        "operation", e.getOperation(),
+                        "riskLevel", e.getRiskLevel(),
+                        "confirmationToken", e.getConfirmationToken(),
+                        "message", e.getMessage()
+                ))
+                .build());
     } catch (Exception e) {
         log.error("AI 对话流式失败", e);
         return Flux.just(ServerSentEvent.<Map<String, Object>>builder()

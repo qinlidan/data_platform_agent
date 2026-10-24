@@ -25,6 +25,19 @@ spring:
       chat:
         enabled: false
 
+  # 邮件配置（测试环境）
+  mail:
+    host: smtp.test.com
+    port: 587
+    username: test@test.com
+    password: test-password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
 # MyBatis-Plus 配置
 mybatis-plus:
   configuration:
@@ -39,7 +52,7 @@ mybatis-plus:
 
 # JWT 配置
 jwt:
-  secret: test-secret-key-for-jwt-token
+  secret: test-secret-key-for-jwt-token-with-at-least-256-bits-length
   expiration: 86400000
 
 # 日志配置

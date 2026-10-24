@@ -136,7 +136,6 @@ public class JobVersionServiceImpl implements JobVersionService {
 
         // 更新作业状态
         job.setStatus(JobStatus.PUBLISHED);
-        job.setPublishedVersion(version.getVersion());
         jobMapper.updateById(job);
     }
 

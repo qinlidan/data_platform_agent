@@ -8,7 +8,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * 数据开发平台主应用类
  */
 @SpringBootApplication
-@MapperScan("com.dataplatform.mapper")
+@MapperScan({"com.dataplatform.mapper", "com.dataplatform.auth.mapper"})
 public class DataPlatformApplication {
 
     public static void main(String[] args) {

@@ -1,12 +1,14 @@
 package com.dataplatform.ai.tools;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.dataplatform.ai.confirmation.RequireConfirmation;
 import com.dataplatform.dto.JobCreateRequest;
 import com.dataplatform.dto.JobQueryRequest;
 import com.dataplatform.dto.JobUpdateRequest;
 import com.dataplatform.entity.DataSource;
 import com.dataplatform.entity.Job;
 import com.dataplatform.enums.EngineType;
+import com.dataplatform.enums.JobStatus;
 import com.dataplatform.enums.JobType;
 import com.dataplatform.exception.BusinessException;
 import com.dataplatform.service.DataSourceService;
@@ -72,6 +74,8 @@ public class JobTool {
         - jobId: 作业ID，必填
 
         返回：格式化的作业详情字符串
+        说明：本工具getJobDetails无法直接返回数据源详情，只能拿到数据源id,SourceDatasourceId之后，
+        调用数据源查询工具才能获取数据源详情
         """)
     public String getJobDetails(@ToolParam(description = "作业ID") Long jobId) {
         try {
@@ -90,14 +94,13 @@ public class JobTool {
                 - 目标库表：%s.%s
                 - 执行引擎：%s
                 - 当前版本：%d
-                - 发布版本：%d
                 - 创建时间：%s
                 - 更新时间：%s
                 """,
                     job.getId(), job.getJobName(), job.getJobCnName(), job.getJobType(), job.getStatus(),
                     job.getSourceDatasourceId(), job.getSourceDatabase(), job.getSourceTable(),
                     job.getTargetDatabase(), job.getTargetTable(), job.getEngineType(),
-                    job.getCurrentVersion(), job.getPublishedVersion(),
+                    job.getCurrentVersion(),
                     job.getCreateTime().format(DATE_FORMATTER),
                     job.getUpdateTime().format(DATE_FORMATTER)
             );
@@ -160,29 +163,32 @@ public class JobTool {
     }
 
     @Tool(description = """
-        搜索作业。根据关键词、作业类型、作业状态搜索作业，以表格形式流式推送到前端。
+        搜索作业。根据作业类型、作业状态搜索作业，以表格形式流式推送到前端。
 
         参数：
-        - keyword: 搜索关键词（模糊匹配作业编码或名称），可选
         - jobType: 作业类型（DB2HIVE 或 HIVE2HIVE），可选
         - status: 作业状态（DRAFT、PUBLISHED、ARCHIVED），可选
 
         返回：摘要文字（表格数据通过SSE事件流推送）
         """)
     public String searchJobs(
-            @ToolParam(description = "搜索关键词") String keyword,
             @ToolParam(description = "作业类型：DB2HIVE | HIVE2HIVE") String jobType,
             @ToolParam(description = "作业状态：DRAFT | PUBLISHED | ARCHIVED") String status
     ) {
         try {
-            log.info("[AI Tool] searchJobs - keyword: {}, jobType: {}, status: {}", keyword, jobType, status);
+            log.info("[AI Tool] searchJobs - jobType: {}, status: {}", jobType, status);
 
             JobQueryRequest request = new JobQueryRequest();
             request.setPageNum(1);
             request.setPageSize(20);
-            request.setKeyword(keyword);
-            request.setJobType(jobType);
-            request.setStatus(status);
+
+            // 枚举转换
+            if (jobType != null && !jobType.isBlank()) {
+                request.setJobType(JobType.valueOf(jobType));
+            }
+            if (status != null && !status.isBlank()) {
+                request.setStatus(JobStatus.valueOf(status));
+            }
 
             Page<Job> page = jobService.page(request);
             List<Job> jobs = page.getRecords();
@@ -335,6 +341,7 @@ public class JobTool {
 
         返回：操作结果描述或确认提示
         """)
+    @RequireConfirmation(operation = "删除作业", riskLevel = "high")
     public String deleteJob(
             @ToolParam(description = "jobId") Long jobId,
             @ToolParam(description = "confirmed") Boolean confirmed
@@ -370,6 +377,7 @@ public class JobTool {
 
         返回：操作结果描述或确认提示
         """)
+    @RequireConfirmation(operation = "发布作业", riskLevel = "medium")
     public String publishJob(
             @ToolParam(description = "jobId") Long jobId,
             @ToolParam(description = "version") Integer version,
