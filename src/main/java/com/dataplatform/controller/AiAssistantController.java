@@ -52,6 +52,8 @@ public class AiAssistantController {
     private final ChatMemory chatMemory;
     private final SystemPromptTemplate pureConversationSystemPrompt;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final com.dataplatform.service.ConversationService conversationService;
+    private final com.dataplatform.service.MessageService messageService;
 
     public AiAssistantController(
             ChatModel chatModel,
@@ -59,7 +61,9 @@ public class AiAssistantController {
             DataSourceService dataSourceService,
             FaqMapper faqMapper,
             ChatMemory chatMemory,
-            @Qualifier("pureConversationSystemPrompt") SystemPromptTemplate pureConversationSystemPrompt
+            @Qualifier("pureConversationSystemPrompt") SystemPromptTemplate pureConversationSystemPrompt,
+            com.dataplatform.service.ConversationService conversationService,
+            com.dataplatform.service.MessageService messageService
     ) {
         this.chatModel = chatModel;
         this.jobService = jobService;
@@ -67,6 +71,8 @@ public class AiAssistantController {
         this.faqMapper = faqMapper;
         this.chatMemory = chatMemory;
         this.pureConversationSystemPrompt = pureConversationSystemPrompt;
+        this.conversationService = conversationService;
+        this.messageService = messageService;
     }
 
     @Operation(summary = "AI对话 - 自然语言创建/管理作业")
@@ -111,7 +117,10 @@ public class AiAssistantController {
 
     @Operation(summary = "AI 对话流式输出 - SSE（支持逐行表格渲染 + 工具调用可见）")
 @GetMapping(value = "/chat/stream")
-public Flux<ServerSentEvent<Map<String, Object>>> chatStream(@RequestParam String message) {
+public Flux<ServerSentEvent<Map<String, Object>>> chatStream(
+        @RequestParam String message,
+        @RequestParam(required = false, defaultValue = "anonymous") String userId
+) {
     if (message == null || message.trim().isEmpty()) {
         return Flux.just(ServerSentEvent.<Map<String, Object>>builder()
                 .event("error")
@@ -120,7 +129,11 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(@RequestParam Strin
     }
 
     try {
-        log.info("收到用户消息（流式）：{}", message);
+        log.info("收到用户消息（流式）：{}, userId: {}", message, userId);
+
+        // 创建会话并保存用户消息
+        Long conversationId = conversationService.getOrCreateConversation(userId);
+        messageService.saveUserMessage(conversationId, message);
 
         // 为当前请求创建独立的 UI 事件通道
         Sinks.Many<Map<String, Object>> uiEventSink = Sinks.many().unicast().onBackpressureBuffer();
@@ -139,6 +152,9 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(@RequestParam Strin
                 .defaultToolCallbacks(monitoredTools)
                 .build();
 
+        // 用于收集助手完整响应内容
+        StringBuilder assistantResponse = new StringBuilder();
+
         // 文本流：模型逐 token 生成
         Flux<ServerSentEvent<Map<String, Object>>> textStream = chatClient.prompt()
                 .system(SYSTEM_PROMPT)
@@ -152,12 +168,21 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(@RequestParam Strin
                     if (content == null || content.isEmpty()) {
                         return null;
                     }
+                    // 累积助手响应
+                    assistantResponse.append(content);
                     return ServerSentEvent.<Map<String, Object>>builder()
                             .event("text")
                             .data(Map.of("content", content))
                             .build();
                 })
-                .doOnComplete(() -> uiEventSink.tryEmitComplete())
+                .doOnComplete(() -> {
+                    // 保存助手完整响应
+                    if (assistantResponse.length() > 0) {
+                        messageService.saveAssistantMessage(conversationId, assistantResponse.toString(), null);
+                        log.debug("[AiAssistantController] Saved assistant message for conversation: {}", conversationId);
+                    }
+                    uiEventSink.tryEmitComplete();
+                })
                 .doOnError(e -> uiEventSink.tryEmitComplete());
 
         // UI 事件流：工具方法推送的表格数据 + 工具调用状态
