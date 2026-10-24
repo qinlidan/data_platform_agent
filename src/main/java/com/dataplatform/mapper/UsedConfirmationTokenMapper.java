@@ -5,7 +5,7 @@ import com.dataplatform.entity.UsedConfirmationToken;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * 已用确认令牌 Mapper
+ * 已使用确认 Token Mapper
  */
 @Mapper
 public interface UsedConfirmationTokenMapper extends BaseMapper<UsedConfirmationToken> {
