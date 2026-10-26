@@ -1,5 +1,6 @@
 package com.dataplatform.config;
 
+import com.dataplatform.ai.validation.ToolValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
@@ -10,9 +11,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
+import java.util.concurrent.Executors;
+
 /**
  * AI 配置类
- * 配置 DeepSeek 和 DashScope (阿里百炼) 的 ChatModel
+ * 配置 DeepSeek 和使用 DashScope 自动配置
  */
 @Configuration
 @RequiredArgsConstructor
@@ -25,6 +28,8 @@ public class AIConfig {
      * Qwen-Turbo (7B) ChatModel - 主模型
      * 用于意图识别、工具调用、参数提取
      * 优势：延迟低(0.8s)、成本低(¥0.0008/千token)、准确率95%+
+     *
+     * 注意：使用 OpenAI 兼容接口而非 DashScope 原生 SDK
      */
     @Bean
     @Primary
@@ -72,25 +77,17 @@ public class AIConfig {
     }
 
     /**
-     * DashScope (阿里百炼) ChatModel - 别名（向后兼容）
+     * dashscopeChatModel 由 spring-ai-alibaba-starter-dashscope 自动配置
+     * 如需使用 DashScope 原生 ChatModel，通过 @Qualifier("dashscopeChatModel") 注入
+     */
+
+    /**
+     * 工具校验器 Bean
+     * <p>
+     * 用于在工具调用时进行参数校验和智能转换
      */
     @Bean
-    @Qualifier("dashscope")
-    public ChatModel dashscopeChatModel() {
-        OpenAiApi openAiApi = OpenAiApi.builder()
-                .baseUrl(dashScopeProperties.getBaseUrl())
-                .apiKey(dashScopeProperties.getApiKey())
-                .build();
-
-        OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .model(dashScopeProperties.getModel())
-                .temperature(0.7)
-                .maxTokens(2000)
-                .build();
-
-        return OpenAiChatModel.builder()
-                .openAiApi(openAiApi)
-                .defaultOptions(options)
-                .build();
+    public ToolValidator toolValidator() {
+        return new ToolValidator();
     }
 }

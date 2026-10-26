@@ -6,36 +6,47 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * AI 对话会话实体
+ * AI 会话实体
  */
 @Data
 @TableName("conversations")
 public class Conversation {
 
-    @TableId(value = "id", type = IdType.AUTO)
+    /**
+     * 会话 ID（雪花算法生成）
+     */
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     /**
      * 用户标识
      */
-    @TableField("user_id")
     private String userId;
 
     /**
-     * 会话状态：active-进行中, transferred-已转人工, ended-已结束
+     * 会话标题
      */
-    @TableField("status")
-    private String status;
+    private String title;
+
+    /**
+     * 会话状态
+     */
+    private ConversationStatus status;
 
     /**
      * 创建时间
      */
-    @TableField(value = "created_at", fill = FieldFill.INSERT)
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
     /**
-     * 更新时间
+     * 最后更新时间
      */
-    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
+
+    /**
+     * 软删除时间
+     */
+    private LocalDateTime deletedAt;
 }

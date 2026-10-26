@@ -1,11 +1,11 @@
 package com.dataplatform.ai.tools;
 
+import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.dataplatform.ai.retry.RetryableQuery;
 import com.dataplatform.entity.Faq;
-import com.dataplatform.mapper.FaqMapper;
+import com.dataplatform.service.FaqService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class FaqTool {
 
-    private final FaqMapper faqMapper;
+    private final FaqService faqService;
 
     @Tool(description = """
         查询常见问题知识库。根据关键词搜索故障诊断、性能优化等问题的答案。
@@ -36,7 +36,13 @@ public class FaqTool {
     ) {
         log.info("[AI Tool] queryFaq - keyword: {}, category: {}", keyword, category);
 
-        List<Faq> faqs = faqMapper.searchFaq(keyword, category);
+        List<Faq> faqs = faqService.lambdaQuery()
+                .eq(Faq::getIsEnabled, true)
+                .and(w -> w.like(Faq::getQuestion, keyword).or().like(Faq::getAnswer, keyword))
+                .eq(StringUtils.isNotBlank(category), Faq::getCategory, category)
+                .orderByAsc(Faq::getDisplayOrder)
+                .last("LIMIT 5")
+                .list();
 
         if (faqs.isEmpty()) {
             return "未找到匹配的FAQ";

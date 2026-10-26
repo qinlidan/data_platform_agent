@@ -27,13 +27,20 @@ spring:
     locations: classpath:db/migration,classpath:db/seed
     baseline-on-migrate: true
 
-  # Spring AI 配置 - 禁用默认的 OpenAI 自动配置
+  # Spring AI 配置
   ai:
     openai:
       api-key: dummy
       base-url: https://api.openai.com
       chat:
         enabled: false
+    # DashScope (阿里百炼) 自动配置
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY}
+      chat:
+        options:
+          model: qwen3.8-flash
+          temperature: 0.7
 
   # Spring Mail 邮件服务配置
   # 生产环境建议通过环境变量 MAIL_PASSWORD 设置邮箱密码

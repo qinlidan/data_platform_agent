@@ -71,7 +71,14 @@ public class ConfirmationService {
                 UsedConfirmationToken usedToken = new UsedConfirmationToken();
                 usedToken.setJti(jti);
                 usedToken.setToolName(toolName);
-                usedToken.setToolParams(claims.get("params") != null ? claims.get("params").toString() : "{}");
+                Object paramsObj = claims.get("params");
+                if (paramsObj instanceof Map) {
+                    usedToken.setToolParams((Map<String, Object>) paramsObj);
+                } else if (paramsObj != null) {
+                    usedToken.setToolParams(Map.of("raw", paramsObj.toString()));
+                } else {
+                    usedToken.setToolParams(Map.of());
+                }
                 usedToken.setUsedAt(LocalDateTime.now());
                 usedToken.setExpiresAt(LocalDateTime.now().plusMinutes(5));
                 usedTokenMapper.insert(usedToken);

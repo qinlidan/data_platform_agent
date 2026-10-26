@@ -23,7 +23,8 @@ public class NaturalLanguageJobServiceImpl implements NaturalLanguageJobService 
     @Qualifier("deepseek")
     private final ChatModel deepseekChatModel;
 
-    @Qualifier("dashscope")
+    // 使用自动配置的 DashScope ChatModel
+    @Qualifier("dashscopeChatModel")
     private final ChatModel dashscopeChatModel;
 
     @Override

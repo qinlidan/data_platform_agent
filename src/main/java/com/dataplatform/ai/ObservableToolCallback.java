@@ -1,6 +1,5 @@
 package com.dataplatform.ai;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
@@ -8,24 +7,12 @@ import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.metadata.ToolMetadata;
 import reactor.core.publisher.Sinks;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
- * 工具回调装饰器（Decorator Pattern）
- *
- * <p>在不修改原有工具类的前提下，为工具调用添加可观测性：
- * <ul>
- *   <li>工具调用开始/结束/失败事件</li>
- *   <li>执行耗时统计</li>
- *   <li>异常监控</li>
- * </ul>
- *
- * <p>设计模式：Decorator Pattern
- * <pre>
- * ToolCallback wrappedTool = new ObservableToolCallback(originalTool, eventSink);
- * wrappedTool.call(input); // 自动发送监控事件
- * </pre>
+ * 可观察的工具回调包装器 - 发射工具调用事件到 UI
+ * 使用代理模式，所有方法委托给原始 ToolCallback
  *
  * @author Data Platform Team
  */
@@ -33,21 +20,11 @@ import java.util.Map;
 public class ObservableToolCallback implements ToolCallback {
 
     private final ToolCallback delegate;
-    private final Sinks.Many<Map<String, Object>> uiEventSink;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Sinks.Many<Map<String, Object>> eventSink;
 
-    /**
-     * 构造装饰器
-     *
-     * @param delegate 被装饰的原始工具回调
-     * @param uiEventSink UI 事件通道（可为 null，此时仅记录日志）
-     */
-    public ObservableToolCallback(ToolCallback delegate, Sinks.Many<Map<String, Object>> uiEventSink) {
-        if (delegate == null) {
-            throw new IllegalArgumentException("delegate cannot be null");
-        }
+    public ObservableToolCallback(ToolCallback delegate, Sinks.Many<Map<String, Object>> eventSink) {
         this.delegate = delegate;
-        this.uiEventSink = uiEventSink;
+        this.eventSink = eventSink;
     }
 
     @Override
@@ -61,101 +38,66 @@ public class ObservableToolCallback implements ToolCallback {
     }
 
     @Override
-    public String call(String toolInput) {
+    public String call(String functionArguments) {
+        // 获取工具名
         String toolName = getToolDefinition().name();
-        log.info("[Tool Monitor] 开始调用工具: {}", toolName);
-        emitToolStart(toolName, toolInput);
+        String toolCallId = UUID.randomUUID().toString().substring(0, 8);
+
+        // 发射 tool_start 事件
+        emit("tool_start", Map.of(
+                "toolName", toolName,
+                "toolCallId", toolCallId,
+                "arguments", functionArguments
+        ));
 
         long startTime = System.currentTimeMillis();
         try {
-            String result = delegate.call(toolInput);
+            String result = delegate.call(functionArguments);
             long duration = System.currentTimeMillis() - startTime;
-            log.info("[Tool Monitor] 工具调用成功: {} (耗时: {}ms)", toolName, duration);
-            emitToolEnd(toolName, result, duration, null);
+
+            // 发射 tool_end 事件（成功）
+            emit("tool_end", Map.of(
+                    "toolName", toolName,
+                    "toolCallId", toolCallId,
+                    "success", true,
+                    "result", result,
+                    "duration", duration
+            ));
+
             return result;
+
         } catch (Exception e) {
             long duration = System.currentTimeMillis() - startTime;
-            log.error("[Tool Monitor] 工具调用失败: {} (耗时: {}ms)", toolName, duration, e);
-            emitToolEnd(toolName, null, duration, e.getMessage());
-            throw e; // 重新抛出异常，保持原有行为
+            log.error("[ObservableToolCallback] 工具 {} 执行失败", toolName, e);
+
+            // 发射 tool_end 事件（失败）
+            emit("tool_end", Map.of(
+                    "toolName", toolName,
+                    "toolCallId", toolCallId,
+                    "success", false,
+                    "error", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName(),
+                    "duration", duration
+            ));
+
+            throw e;
         }
     }
 
     @Override
     public String call(String toolInput, ToolContext toolContext) {
-        String toolName = getToolDefinition().name();
-        log.info("[Tool Monitor] 开始调用工具(带上下文): {}", toolName);
-        emitToolStart(toolName, toolInput);
-
-        long startTime = System.currentTimeMillis();
-        try {
-            String result = delegate.call(toolInput, toolContext);
-            long duration = System.currentTimeMillis() - startTime;
-            log.info("[Tool Monitor] 工具调用成功(带上下文): {} (耗时: {}ms)", toolName, duration);
-            emitToolEnd(toolName, result, duration, null);
-            return result;
-        } catch (Exception e) {
-            long duration = System.currentTimeMillis() - startTime;
-            log.error("[Tool Monitor] 工具调用失败(带上下文): {} (耗时: {}ms)", toolName, duration, e);
-            emitToolEnd(toolName, null, duration, e.getMessage());
-            throw e; // 重新抛出异常，保持原有行为
-        }
+        // 默认实现：忽略 ToolContext，调用单参数版本
+        return call(toolInput);
     }
 
     /**
-     * 发送工具调用开始事件
+     * 发射事件到 UI（非阻塞）
      */
-    private void emitToolStart(String toolName, String toolInput) {
-        if (uiEventSink == null) {
-            return; // 容错：如果没有 Sink，只记录日志
-        }
-
-        try {
-            Map<String, Object> event = new HashMap<>();
-            event.put("event", "tool_start");
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("toolName", toolName);
-            payload.put("input", toolInput);
-            payload.put("timestamp", System.currentTimeMillis());
-            event.put("payload", payload);
-
-            uiEventSink.tryEmitNext(event);
-        } catch (Exception e) {
-            log.warn("[Tool Monitor] 发送 tool_start 事件失败: {}", e.getMessage());
-        }
-    }
-
-    /**
-     * 发送工具调用结束事件
-     *
-     * @param errorMessage 如果调用失败，传入错误信息；成功则为 null
-     */
-    private void emitToolEnd(String toolName, String result, long durationMs, String errorMessage) {
-        if (uiEventSink == null) {
-            return;
-        }
-
-        try {
-            Map<String, Object> event = new HashMap<>();
-            event.put("event", "tool_end");
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("toolName", toolName);
-            payload.put("durationMs", durationMs);
-            payload.put("timestamp", System.currentTimeMillis());
-
-            if (errorMessage != null) {
-                payload.put("success", false);
-                payload.put("error", errorMessage);
-            } else {
-                payload.put("success", true);
-                // 不传输完整 result，避免过大（前端不需要显示）
+    private void emit(String event, Object payload) {
+        if (eventSink != null) {
+            Sinks.EmitResult result = eventSink.tryEmitNext(Map.of("event", event, "payload", payload));
+            if (result.isFailure()) {
+                log.warn("[ObservableToolCallback] UI 事件发射失败: event={}, result={}", event, result);
             }
-
-            event.put("payload", payload);
-
-            uiEventSink.tryEmitNext(event);
-        } catch (Exception e) {
-            log.warn("[Tool Monitor] 发送 tool_end 事件失败: {}", e.getMessage());
         }
     }
 }

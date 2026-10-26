@@ -24,16 +24,15 @@
         <hutool.version>5.8.25</hutool.version>
         <springdoc.version>2.3.0</springdoc.version>
         <jsqlparser.version>4.6</jsqlparser.version>
-        <spring-ai.version>1.0.3</spring-ai.version>
-        <langgraph4j.version>1.9.6</langgraph4j.version>
+        <spring-ai.version>1.0.0</spring-ai.version>
+        <spring-ai-alibaba.version>1.0.0.4</spring-ai-alibaba.version>
     </properties>
 
-    <!-- Spring AI 1.0.3 (最新稳定版) 已经发布到Maven中央仓库 -->
-
-    <!-- 阿里云镜像未同步 Spring AI 1.0.1,临时添加 Maven Central -->
+    <!-- Spring AI 依赖需要从 Maven Central 下载 -->
     <repositories>
         <repository>
-            <id>central</id>
+            <id>maven-central-direct</id>
+            <name>Maven Central (Direct)</name>
             <url>https://repo1.maven.org/maven2</url>
             <releases><enabled>true</enabled></releases>
             <snapshots><enabled>false</enabled></snapshots>
@@ -59,11 +58,19 @@
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
-        <!-- ========== 这里是修改点：替换为SpringAI 1.0 GA新artifactId ========== -->
+        <!-- ========== Spring AI OpenAI (版本由 BOM 管理) ========== -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-openai</artifactId>
         </dependency>
+
+        <!-- Spring AI Alibaba - 阿里云通义千问模型 (版本由 BOM 管理) -->
+        <dependency>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-starter-dashscope</artifactId>
+        </dependency>
+
+        <!-- JWT -->
 
         <!-- JWT -->
         <dependency>
@@ -194,18 +201,20 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
-
-        <!-- LangGraph4j - AI Agent Workflow -->
-        <dependency>
-            <groupId>org.bsc.langgraph4j</groupId>
-            <artifactId>langgraph4j-core</artifactId>
-            <version>${langgraph4j.version}</version>
-        </dependency>
     </dependencies>
 
-    <!-- Spring AI BOM 统一管理AI相关依赖版本 -->
+    <!-- BOM 统一管理 Spring AI 和 Spring AI Alibaba 依赖版本 -->
     <dependencyManagement>
         <dependencies>
+            <!-- Spring AI Alibaba BOM -->
+            <dependency>
+                <groupId>com.alibaba.cloud.ai</groupId>
+                <artifactId>spring-ai-alibaba-bom</artifactId>
+                <version>${spring-ai-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Spring AI BOM -->
             <dependency>
                 <groupId>org.springframework.ai</groupId>
                 <artifactId>spring-ai-bom</artifactId>

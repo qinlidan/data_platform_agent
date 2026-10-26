@@ -1,43 +1,127 @@
 package com.dataplatform.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.dataplatform.common.IdGenerator;
 import com.dataplatform.entity.Conversation;
+import com.dataplatform.entity.ConversationStatus;
 import com.dataplatform.mapper.ConversationMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 会话服务
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
-public class ConversationService {
+public class ConversationService extends ServiceImpl<ConversationMapper, Conversation> {
 
-    private final ConversationMapper conversationMapper;
+    private final IdGenerator idGenerator;
+
+    public ConversationService(IdGenerator idGenerator) {
+        this.idGenerator = idGenerator;
+    }
 
     /**
-     * 获取或创建会话
-     * 当前实现：每次都创建新会话（简化逻辑，后续可优化为复用进行中的会话）
+     * 创建新会话
+     *
+     * @param userId 用户ID
+     * @param title  会话标题
+     * @return 会话ID
+     */
+    public Long createConversation(String userId, String title) {
+        Long conversationId = idGenerator.nextId();
+
+        Conversation conversation = new Conversation();
+        conversation.setId(conversationId);
+        conversation.setUserId(userId);
+        conversation.setTitle(title != null ? title : "新会话");
+        conversation.setStatus(ConversationStatus.ACTIVE);
+
+        save(conversation);
+        log.debug("[ConversationService] Created new conversation: id={}, userId={}", conversationId, userId);
+
+        return conversationId;
+    }
+
+    /**
+     * 创建默认会话
      *
      * @param userId 用户ID
      * @return 会话ID
      */
-    public Long getOrCreateConversation(String userId) {
-        // 当前策略：每次对话都创建新会话
-        Conversation conversation = new Conversation();
-        conversation.setUserId(userId);
-        conversation.setStatus("active");
-        conversation.setCreatedAt(LocalDateTime.now());
-        conversation.setUpdatedAt(LocalDateTime.now());
+    public Long createDefaultConversation(String userId) {
+        return createConversation(userId, "新会话");
+    }
 
-        conversationMapper.insert(conversation);
-        log.debug("[ConversationService] Created new conversation: id={}, userId={}", conversation.getId(), userId);
+    /**
+     * 获取或创建会话
+     * 如果 conversationId 为空，则创建新会话
+     *
+     * @param userId         用户ID
+     * @param conversationId 会话ID（可为 null）
+     * @return 会话ID
+     */
+    public Long getOrCreateConversation(String userId, Long conversationId) {
+        if (conversationId == null) {
+            return createDefaultConversation(userId);
+        }
 
-        return conversation.getId();
+        // 验证会话是否存在且属于当前用户
+        Conversation conversation = getById(conversationId);
+        if (conversation == null || !conversation.getUserId().equals(userId)) {
+            log.warn("[ConversationService] Conversation not found or access denied: id={}, userId={}", conversationId, userId);
+            return createDefaultConversation(userId);
+        }
+
+        return conversationId;
+    }
+
+    /**
+     * 列出用户的活跃会话
+     *
+     * @param userId 用户ID
+     * @return 会话列表
+     */
+    public List<Conversation> listByUserId(String userId) {
+        return lambdaQuery()
+                .eq(Conversation::getUserId, userId)
+                .eq(Conversation::getStatus, ConversationStatus.ACTIVE)
+                .isNull(Conversation::getDeletedAt)
+                .orderByDesc(Conversation::getUpdatedAt)
+                .list();
+    }
+
+    /**
+     * 软删除会话
+     *
+     * @param conversationId 会话ID
+     */
+    public void softDelete(Long conversationId) {
+        lambdaUpdate()
+                .eq(Conversation::getId, conversationId)
+                .set(Conversation::getStatus, ConversationStatus.DELETED)
+                .set(Conversation::getDeletedAt, LocalDateTime.now())
+                .update();
+        log.debug("[ConversationService] Soft deleted conversation: id={}", conversationId);
+    }
+
+    /**
+     * 更新会话标题
+     *
+     * @param conversationId 会话ID
+     * @param title          新标题
+     */
+    public void updateTitle(Long conversationId, String title) {
+        lambdaUpdate()
+                .eq(Conversation::getId, conversationId)
+                .set(Conversation::getTitle, title)
+                .update();
+        log.debug("[ConversationService] Updated conversation title: id={}, title={}", conversationId, title);
     }
 
     /**
@@ -46,13 +130,11 @@ public class ConversationService {
      * @param conversationId 会话ID
      */
     public void endConversation(Long conversationId) {
-        Conversation conversation = conversationMapper.selectById(conversationId);
-        if (conversation != null) {
-            conversation.setStatus("ended");
-            conversation.setUpdatedAt(LocalDateTime.now());
-            conversationMapper.updateById(conversation);
-            log.debug("[ConversationService] Ended conversation: id={}", conversationId);
-        }
+        lambdaUpdate()
+                .eq(Conversation::getId, conversationId)
+                .set(Conversation::getStatus, ConversationStatus.CLOSED)
+                .update();
+        log.debug("[ConversationService] Ended conversation: id={}", conversationId);
     }
 
     /**
@@ -62,11 +144,11 @@ public class ConversationService {
      * @return 会话，如果没有则返回 null
      */
     public Conversation getActiveConversation(String userId) {
-        LambdaQueryWrapper<Conversation> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Conversation::getUserId, userId)
-                .eq(Conversation::getStatus, "active")
+        return lambdaQuery()
+                .eq(Conversation::getUserId, userId)
+                .eq(Conversation::getStatus, ConversationStatus.ACTIVE)
                 .orderByDesc(Conversation::getCreatedAt)
-                .last("LIMIT 1");
-        return conversationMapper.selectOne(wrapper);
+                .last("LIMIT 1")
+                .one();
     }
 }

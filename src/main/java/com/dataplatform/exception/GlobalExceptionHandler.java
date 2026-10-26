@@ -1,8 +1,12 @@
 package com.dataplatform.exception;
 
+import com.dataplatform.ai.confirmation.NeedConfirmationException;
+import com.dataplatform.common.ApiResponse;
 import com.dataplatform.common.Result;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
+import org.springframework.retry.ExhaustedRetryException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.BindException;
@@ -13,6 +17,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.sql.SQLException;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -21,6 +26,41 @@ import java.util.stream.Collectors;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /**
+     * 处理需要用户确认的操作（AI 功能）
+     */
+    @ExceptionHandler(NeedConfirmationException.class)
+    public ApiResponse<Map<String, Object>> handleNeedConfirmation(NeedConfirmationException e) {
+        log.info("[Confirmation] Operation requires confirmation: {}", e.getOperation());
+
+        return ApiResponse.error(
+            403,
+            e.getMessage(),
+            Map.of(
+                "operation", e.getOperation(),
+                "riskLevel", e.getRiskLevel(),
+                "confirmationToken", e.getConfirmationToken()
+            )
+        );
+    }
+
+    /**
+     * 处理重试耗尽异常（AI 功能）
+     */
+    @ExceptionHandler(ExhaustedRetryException.class)
+    public ApiResponse<Void> handleExhaustedRetry(ExhaustedRetryException e) {
+        log.error("[Retry] All retry attempts exhausted", e);
+
+        Throwable cause = e.getCause();
+        String message = "操作失败，请稍后重试";
+
+        if (cause instanceof SQLException || cause instanceof DataAccessException) {
+            message = "数据库查询超时，请稍后重试";
+        }
+
+        return ApiResponse.error(500, message);
+    }
 
     /**
      * 业务异常
