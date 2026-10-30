@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StateGraph AI 助手测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB';
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .chat-container {
+            height: 500px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f5f7fa;
+        }
+
+        .message {
+            margin-bottom: 16px;
+            display: flex;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.assistant {
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 8px;
+            line-height: 1.6;
+        }
+
+        .user .message-content {
+            background: #667eea;
+            color: white;
+        }
+
+        .assistant .message-content {
+            background: white;
+            color: #333;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .approval-card {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        .approval-title {
+            font-weight: bold;
+            color: #856404;
+            margin-bottom: 12px;
+        }
+
+        .approval-item {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+
+        .approval-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .approval-actions button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-approve {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-approve:hover {
+            background: #218838;
+        }
+
+        .btn-reject {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-reject:hover {
+            background: #c82333;
+        }
+
+        .input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e6ed;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 12px;
+        }
+
+        .input-container input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e6ed;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border 0.3s;
+        }
+
+        .input-container input:focus {
+            border-color: #667eea;
+        }
+
+        .input-container button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .input-container button:hover {
+            transform: translateY(-2px);
+        }
+
+        .input-container button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .example-prompts {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .example-prompt {
+            padding: 6px 12px;
+            background: #f0f2f5;
+            border-radius: 16px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .example-prompt:hover {
+            background: #e0e6ed;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 0.3;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🤖 StateGraph AI 助手</h1>
+        <p style="margin-top: 8px; opacity: 0.9;">支持工具调用和人工审批</p>
+    </div>
+
+    <div class="chat-container" id="chatContainer"></div>
+
+    <div class="input-area">
+        <div class="input-container">
+            <input type="text" id="userInput" placeholder="输入您的问题...按回车发送" />
+            <button id="sendBtn" onclick="sendMessage()">发送</button>
+        </div>
+
+        <div class="example-prompts">
+            <div class="example-prompt" onclick="fillPrompt('查询所有作业')">查询所有作业</div>
+            <div class="example-prompt" onclick="fillPrompt('创建一个名为test_job的ETL作业')">创建作业</div>
+            <div class="example-prompt" onclick="fillPrompt('删除作业job_001')">删除作业</div>
+            <div class="example-prompt" onclick="fillPrompt('查询数据源列表')">查询数据源</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentCheckpointId = null;
+
+    // 监听回车键
+    document.getElementById('userInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    function fillPrompt(text) {
+        document.getElementById('userInput').value = text;
+        document.getElementById('userInput').focus();
+    }
+
+    function appendMessage(role, content, isHTML = false) {
+        const chatContainer = document.getElementById('chatContainer');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${role}`;
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+
+        if (isHTML) {
+            contentDiv.innerHTML = content;
+        } else {
+            contentDiv.textContent = content;
+        }
+
+        messageDiv.appendChild(contentDiv);
+        chatContainer.appendChild(messageDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function showApprovalCard(approvalData) {
+        const chatContainer = document.getElementById('chatContainer');
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'approval-card';
+
+        let itemsHTML = '';
+        approvalData.pendingApprovals.forEach(item => {
+            itemsHTML += `<div class="approval-item">工具：${item.toolName}<br>参数：${JSON.stringify(item.params)}</div>`;
+        });
+
+        cardDiv.innerHTML = `
+            <div class="approval-title">⚠️ ${approvalData.message}</div>
+            ${itemsHTML}
+            <div class="approval-actions">
+                <button class="btn-approve" onclick="handleApproval('${approvalData.checkpointId}', true)">✅ 确认执行</button>
+                <button class="btn-reject" onclick="handleApproval('${approvalData.checkpointId}', false)">❌ 取消操作</button>
+            </div>
+        `;
+
+        chatContainer.appendChild(cardDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        currentCheckpointId = approvalData.checkpointId;
+    }
+
+    function sendMessage() {
+        const input = document.getElementById('userInput');
+        const message = input.value.trim();
+
+        if (!message) {
+            return;
+        }
+
+        // 显示用户消息
+        appendMessage('user', message);
+        input.value = '';
+
+        // 禁用输入
+        document.getElementById('sendBtn').disabled = true;
+        input.disabled = true;
+
+        // 显示加载状态
+        const loadingMsg = document.createElement('div');
+        loadingMsg.className = 'message assistant';
+        loadingMsg.id = 'loadingMsg';
+        loadingMsg.innerHTML = '<div class="message-content"><span class="loading"></span> AI思考中...</div>';
+        document.getElementById('chatContainer').appendChild(loadingMsg);
+
+        // 连接 SSE
+        const eventSource = new EventSource(`/api/ai/v2/chat/stream?message=${encodeURIComponent(message)}&userId=test_user`);
+
+        let responseText = '';
+
+        eventSource.addEventListener('text', function (e) {
+            const data = JSON.parse(e.data);
+            responseText += data.content;
+
+            // 移除加载消息
+            const loading = document.getElementById('loadingMsg');
+            if (loading) {
+                loading.remove();
+            }
+
+            // 更新或创建响应消息
+            let responseDiv = document.getElementById('currentResponse');
+            if (!responseDiv) {
+                const chatContainer = document.getElementById('chatContainer');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message assistant';
+                messageDiv.id = 'currentResponse';
+                messageDiv.innerHTML = '<div class="message-content"></div>';
+                chatContainer.appendChild(messageDiv);
+                responseDiv = messageDiv;
+            }
+            responseDiv.querySelector('.message-content').textContent = responseText;
+            document.getElementById('chatContainer').scrollTop = document.getElementById('chatContainer').scrollHeight;
+        });
+
+        eventSource.addEventListener('approval_required', function (e) {
+            const data = JSON.parse(e.data);
+
+            // 移除加载消息
+            const loading = document.getElementById('loadingMsg');
+            if (loading) {
+                loading.remove();
+            }
+
+            showApprovalCard(data);
+            eventSource.close();
+
+            // 恢复输入
+            document.getElementById('sendBtn').disabled = false;
+            input.disabled = false;
+        });
+
+        eventSource.addEventListener('done', function (e) {
+            eventSource.close();
+
+            // 移除加载消息
+            const loading = document.getElementById('loadingMsg');
+            if (loading) {
+                loading.remove();
+            }
+
+            // 清除临时ID
+            const currentResponse = document.getElementById('currentResponse');
+            if (currentResponse) {
+                currentResponse.removeAttribute('id');
+            }
+
+            // 恢复输入
+            document.getElementById('sendBtn').disabled = false;
+            input.disabled = false;
+        });
+
+        eventSource.addEventListener('error', function (e) {
+            eventSource.close();
+
+            // 移除加载消息
+            const loading = document.getElementById('loadingMsg');
+            if (loading) {
+                loading.remove();
+            }
+
+            appendMessage('assistant', '抱歉，发生了错误，请稍后重试。');
+
+            // 恢复输入
+            document.getElementById('sendBtn').disabled = false;
+            input.disabled = false;
+        });
+    }
+
+    function handleApproval(checkpointId, approved) {
+        appendMessage('assistant', approved ? '✅ 正在执行操作...' : '❌ 操作已取消');
+
+        fetch('/api/ai/v2/approval', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({checkpointId, approved})
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.code === 200) {
+                    appendMessage('assistant', data.data.message || '执行完成');
+                } else {
+                    appendMessage('assistant', '执行失败：' + data.message);
+                }
+            })
+            .catch(err => {
+                appendMessage('assistant', '请求失败：' + err.message);
+            });
+    }
+
+    // 初始化消息
+    appendMessage('assistant', '您好！我是 StateGraph AI 助手，可以帮您管理作业和数据源。请试试下方的示例问题。');
+</script>
+</body>
+</html>

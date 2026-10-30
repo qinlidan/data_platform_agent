@@ -89,9 +89,9 @@ public class Job {
     private String createBy;
 
     /**
-     * 创建人ID
+     * 创建人ID（用户ID）
      */
-    private Long createById;
+    private String creatorId;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private String updateBy;

@@ -89,4 +89,43 @@ public class ConfirmationService {
             return false;
         }
     }
+
+    /**
+     * 从 token 中提取原始工具调用参数（不验证、不标记已使用）
+     *
+     * @param token 确认令牌
+     * @return 原始参数 Map，解析失败返回 null
+     */
+    public Map<String, Object> extractParams(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .setSigningKey(secretKey)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            Object paramsObj = claims.get("params");
+            if (paramsObj instanceof Map) {
+                return (Map<String, Object>) paramsObj;
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 验证 token 并返回原始参数（验证通过后标记已使用）
+     *
+     * @param token 确认令牌
+     * @param toolName 工具名
+     * @param methodName 方法名
+     * @return 验证通过返回原始参数，否则返回 null
+     */
+    public Map<String, Object> validateAndGetParams(String token, String toolName, String methodName) {
+        if (!validateToken(token, toolName, methodName)) {
+            return null;
+        }
+        return extractParams(token);
+    }
 }

@@ -1,6 +1,5 @@
 package com.dataplatform.config;
 
-import com.dataplatform.ai.validation.ToolValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
@@ -25,14 +24,13 @@ public class AIConfig {
     private final DashScopeProperties dashScopeProperties;
 
     /**
-     * Qwen-Turbo (7B) ChatModel - 主模型
+     * Qwen-Turbo (7B) ChatModel - 备用模型
      * 用于意图识别、工具调用、参数提取
      * 优势：延迟低(0.8s)、成本低(¥0.0008/千token)、准确率95%+
      *
      * 注意：使用 OpenAI 兼容接口而非 DashScope 原生 SDK
      */
     @Bean
-    @Primary
     @Qualifier("qwen")
     public ChatModel qwenChatModel() {
         OpenAiApi openAiApi = OpenAiApi.builder()
@@ -53,10 +51,11 @@ public class AIConfig {
     }
 
     /**
-     * DeepSeek-V3 ChatModel - 备用模型
-     * 用于复杂推理、代码生成（可选）
+     * DeepSeek-V3 ChatModel - 主模型
+     * 用于复杂推理、工具调用、代码生成
      */
     @Bean
+    @Primary
     @Qualifier("deepseek")
     public ChatModel deepseekChatModel() {
         OpenAiApi openAiApi = OpenAiApi.builder()
@@ -80,14 +79,4 @@ public class AIConfig {
      * dashscopeChatModel 由 spring-ai-alibaba-starter-dashscope 自动配置
      * 如需使用 DashScope 原生 ChatModel，通过 @Qualifier("dashscopeChatModel") 注入
      */
-
-    /**
-     * 工具校验器 Bean
-     * <p>
-     * 用于在工具调用时进行参数校验和智能转换
-     */
-    @Bean
-    public ToolValidator toolValidator() {
-        return new ToolValidator();
-    }
 }

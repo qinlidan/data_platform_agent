@@ -1,342 +1,384 @@
-# Docker Compose 部署准备清单
+# StateGraph AI Agent 部署检查清单
 
-## ✅ 已完成的工作
+## ✅ 部署前检查
 
-### 1. Docker 配置文件
-- ✅ 创建后端 Dockerfile (多阶段构建)
-- ✅ 创建前端 Dockerfile (多阶段构建 + Nginx)
-- ✅ 创建 docker-compose.yml (包含 MySQL、后端、前端)
-- ✅ 创建 .dockerignore 文件
-- ✅ 创建 Nginx 配置文件
+### 1. 环境准备
 
-### 2. 数据库配置
-- ✅ 创建 MySQL 初始化脚本 (`deploy/mysql/init.sql`)
-- ✅ 创建 MySQL 配置文件 (`deploy/mysql/conf.d/my.cnf`)
-- ✅ 配置健康检查
+- [ ] Java 11+ 已安装
+- [ ] Maven 3.6+ 已安装
+- [ ] Redis 6.0+ 已启动并可访问
+- [ ] OpenAI API Key 已准备（或兼容的API）
 
-### 3. 环境配置
-- ✅ 创建 `.env.example` 环境变量模板
-- ✅ 创建生产环境配置 `application-prod.yml`
-- ✅ 配置环境变量注入 (JWT_SECRET, 数据库连接等)
+### 2. 配置检查
 
-### 4. 部署脚本
-- ✅ 创建 Linux/Mac 部署脚本 (`deploy.sh`)
-- ✅ 创建 Windows 部署脚本 (`deploy.bat`)
-- ✅ 创建详细部署文档 (`DOCKER_DEPLOYMENT.md`)
-
-### 5. 应用配置
-- ✅ 前端 API 代理配置 (开发环境: Vite proxy, 生产环境: Nginx proxy)
-- ✅ 后端支持环境变量配置
-- ✅ 健康检查端点配置
-
-## 📋 您需要提供的支持
-
-### 1. 基础环境准备
-
-#### 服务器要求
-```
-- 操作系统: Linux (推荐 Ubuntu 20.04+) 或 Windows Server
-- CPU: 至少 2 核
-- 内存: 至少 4GB (推荐 8GB)
-- 磁盘: 至少 20GB 可用空间
-- 网络: 可访问外网 (用于拉取 Docker 镜像)
-```
-
-#### 安装 Docker 和 Docker Compose
-
-**Linux (Ubuntu/Debian):**
-```bash
-# 安装 Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-
-# 安装 Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-
-# 验证安装
-docker --version
-docker-compose --version
-```
-
-**Windows:**
-- 下载安装 Docker Desktop: https://www.docker.com/products/docker-desktop/
-
-### 2. 配置环境变量
-
-复制 `.env.example` 为 `.env` 并修改：
-
-```bash
-cp .env.example .env
-```
-
-**必须修改的配置项：**
-
-```properties
-# 数据库密码（生产环境务必修改）
-MYSQL_ROOT_PASSWORD=<your-strong-password>
-
-# JWT 密钥（生产环境务必修改，至少 256 位）
-JWT_SECRET=<your-256-bit-secret-key>
-
-# 端口配置（如有冲突请修改）
-MYSQL_PORT=3306
-BACKEND_PORT=8089
-FRONTEND_PORT=80
-```
-
-### 3. 网络和端口配置
-
-**需要开放的端口：**
-- 80 (前端，HTTP)
-- 8089 (后端 API，可选是否对外暴露)
-- 3306 (MySQL，建议仅内网访问)
-
-**防火墙配置 (Linux):**
-```bash
-# 开放 HTTP 端口
-sudo ufw allow 80/tcp
-
-# 如需从外部访问后端 API
-sudo ufw allow 8089/tcp
-
-# 如需从外部访问数据库（不推荐）
-# sudo ufw allow 3306/tcp
-```
-
-### 4. 域名和 HTTPS (可选，生产环境推荐)
-
-如果有域名，建议配置 HTTPS：
-
-#### 方案 1: 使用 Nginx + Let's Encrypt
-
-修改 `docker-compose.yml`，添加 Nginx 反向代理容器：
+`application.yml` 或 `application.properties`：
 
 ```yaml
-nginx-proxy:
-  image: nginx:alpine
-  ports:
-    - "80:80"
-    - "443:443"
-  volumes:
-    - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf
-    - ./deploy/nginx/ssl:/etc/nginx/ssl
-  depends_on:
-    - frontend
+# OpenAI 配置
+openai:
+  api:
+    key: sk-xxxxxxxxxxxxxx  # 必须配置
+    url: https://api.openai.com/v1/chat/completions
+  model: gpt-4  # 或 gpt-3.5-turbo
+
+# Redis 配置
+spring:
+  redis:
+    host: localhost  # Redis 地址
+    port: 6379
+    password:  # 如果有密码
+    database: 0
+    timeout: 5000ms
 ```
 
-#### 方案 2: 使用云服务商的负载均衡器
-- 阿里云 SLB
-- 腾讯云 CLB
-- AWS ELB
+### 3. 依赖检查
 
-### 5. 数据备份策略
+确保 `pom.xml` 包含以下依赖：
 
-**创建备份脚本：**
+```xml
+<!-- Spring Boot WebFlux -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-webflux</artifactId>
+</dependency>
 
-```bash
-cat > /opt/dataplatform/backup.sh << 'EOF'
-#!/bin/bash
-BACKUP_DIR="/opt/dataplatform/backups"
-DATE=$(date +%Y%m%d_%H%M%S)
+<!-- Spring Data Redis Reactive -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+</dependency>
 
-mkdir -p $BACKUP_DIR
+<!-- Lombok -->
+<dependency>
+    <groupId>org.projectlombok</groupId>
+    <artifactId>lombok</artifactId>
+    <optional>true</optional>
+</dependency>
 
-# 备份数据库
-docker-compose exec -T mysql mysqldump \
-  -uroot -p$MYSQL_ROOT_PASSWORD \
-  data_platform | gzip > $BACKUP_DIR/db_backup_$DATE.sql.gz
-
-# 清理 7 天前的备份
-find $BACKUP_DIR -name "db_backup_*.sql.gz" -mtime +7 -delete
-
-echo "Backup completed: db_backup_$DATE.sql.gz"
-EOF
-
-chmod +x /opt/dataplatform/backup.sh
+<!-- Jackson -->
+<dependency>
+    <groupId>com.fasterxml.jackson.core</groupId>
+    <artifactId>jackson-databind</artifactId>
+</dependency>
 ```
-
-**配置定时备份 (crontab):**
-
-```bash
-# 每天凌晨 2 点执行备份
-0 2 * * * /opt/dataplatform/backup.sh >> /var/log/dataplatform-backup.log 2>&1
-```
-
-### 6. 监控和日志
-
-#### 日志管理
-
-**查看实时日志：**
-```bash
-docker-compose logs -f [服务名]
-```
-
-**配置日志轮转：** (防止日志文件过大)
-
-创建 `/etc/docker/daemon.json`:
-```json
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "100m",
-    "max-file": "3"
-  }
-}
-```
-
-重启 Docker:
-```bash
-sudo systemctl restart docker
-```
-
-#### 监控配置 (可选)
-
-推荐工具：
-- Prometheus + Grafana
-- ELK Stack (Elasticsearch + Logstash + Kibana)
-- 云服务商监控 (阿里云 CloudMonitor、腾讯云 CM)
-
-### 7. 安全加固
-
-#### 数据库安全
-```bash
-# 不要将 MySQL 端口暴露到公网
-# 在 docker-compose.yml 中移除或注释掉 MySQL 的 ports 配置
-
-mysql:
-  # ports:
-  #   - "3306:3306"  # 注释掉这行
-```
-
-#### 应用安全
-```bash
-# 修改默认管理员密码
-# 登录后台后立即修改 admin/admin123
-
-# 配置 HTTPS
-# 使用 Let's Encrypt 免费证书
-
-# 限制 API 访问频率
-# 在 Nginx 或应用层配置 rate limiting
-```
-
-## 🚀 部署步骤
-
-### 1. 上传代码到服务器
-
-```bash
-# 方式 1: 使用 Git
-git clone <your-repo-url>
-cd alert4
-
-# 方式 2: 使用 SCP
-scp -r alert4/ user@server:/opt/dataplatform/
-```
-
-### 2. 配置环境变量
-
-```bash
-cd /opt/dataplatform/alert4
-cp .env.example .env
-vim .env  # 修改配置
-```
-
-### 3. 执行部署
-
-**Linux/Mac:**
-```bash
-chmod +x deploy.sh
-./deploy.sh
-```
-
-**Windows:**
-```cmd
-deploy.bat
-```
-
-**或手动部署:**
-```bash
-# 构建并启动
-docker-compose up -d --build
-
-# 查看状态
-docker-compose ps
-
-# 查看日志
-docker-compose logs -f
-```
-
-### 4. 验证部署
-
-```bash
-# 检查服务状态
-docker-compose ps
-
-# 检查健康状态
-curl http://localhost:8089/actuator/health
-curl http://localhost/health
-
-# 访问前端
-# 浏览器打开: http://<服务器IP>
-```
-
-### 5. 首次登录
-
-- URL: http://<服务器IP>
-- 用户名: admin
-- 密码: admin123
-- **立即修改密码！**
-
-## ⚠️ 常见问题和解决方案
-
-### 问题 1: 端口被占用
-```bash
-# 修改 .env 中的端口配置
-BACKEND_PORT=8090
-FRONTEND_PORT=8080
-```
-
-### 问题 2: 内存不足
-```bash
-# 查看资源使用
-docker stats
-
-# 清理未使用的资源
-docker system prune -a
-```
-
-### 问题 3: 数据库初始化失败
-```bash
-# 查看 MySQL 日志
-docker-compose logs mysql
-
-# 重新初始化
-docker-compose down -v
-docker-compose up -d
-```
-
-### 问题 4: 后端连接不上数据库
-```bash
-# 检查网络连接
-docker-compose exec backend ping mysql
-
-# 检查数据库是否就绪
-docker-compose exec mysql mysqladmin ping -h localhost
-```
-
-## 📞 技术支持
-
-部署过程中如遇到问题，请提供：
-1. 操作系统版本
-2. Docker 和 Docker Compose 版本
-3. 错误日志 (`docker-compose logs`)
-4. 配置文件内容 (脱敏后)
 
 ---
 
-**注意事项：**
-- ⚠️ 生产环境务必修改默认密码和密钥
-- ⚠️ 建议配置 HTTPS 和域名
-- ⚠️ 定期备份数据库
-- ⚠️ 监控服务器资源使用情况
+## 🚀 启动步骤
+
+### 1. 启动 Redis
+
+```bash
+# Linux/Mac
+redis-server
+
+# Docker
+docker run -d -p 6379:6379 redis:latest
+
+# 验证
+redis-cli ping  # 应返回 PONG
+```
+
+### 2. 编译项目
+
+```bash
+cd /d/alert4
+mvn clean install -DskipTests
+```
+
+### 3. 启动应用
+
+```bash
+# 方式1：Maven
+mvn spring-boot:run
+
+# 方式2：Jar
+java -jar target/alert4-1.0.0.jar
+
+# 方式3：IDE
+直接运行 Application.java
+```
+
+### 4. 验证启动
+
+打开浏览器访问：
+- http://localhost:8080/stategraph-test.html
+
+应该看到 AI 助手界面。
+
+---
+
+## 🧪 功能测试
+
+### 1. 基础对话测试
+
+在测试页面输入：
+```
+查询所有作业
+```
+
+预期：
+- AI 调用 `searchJobs` 工具
+- 返回作业列表
+
+### 2. 审批流程测试
+
+输入：
+```
+删除作业 job_001
+```
+
+预期：
+- AI 识别需要审批
+- 前端显示审批卡片
+- 点击"确认执行"后完成删除
+
+### 3. 多工具调用测试
+
+输入：
+```
+创建一个名为 test_job 的 ETL 作业，然后查询它的详情
+```
+
+预期：
+- AI 先调用 `createJob`
+- 再调用 `getJobDetail`
+- 返回完整结果
+
+### 4. 错误处理测试
+
+输入：
+```
+删除不存在的作业 job_999
+```
+
+预期：
+- AI 调用 `deleteJob`
+- 返回错误提示
+
+---
+
+## 🔍 日志检查
+
+### 1. 关键日志
+
+启动成功应看到：
+
+```
+[ToolRegistry] 开始注册工具...
+[ToolRegistry] 工具注册完成
+[StateGraph] StateGraph 初始化完成
+```
+
+### 2. 调用日志
+
+对话时应看到：
+
+```
+[AgentNode] 开始推理，消息数：2
+[AgentNode] OpenAI 推理完成，工具调用数：1
+[ToolNode] 执行工具：searchJobs
+[ToolNode] 工具执行完成，结果：{total=3, rows=[...]}
+```
+
+### 3. 审批日志
+
+触发审批时：
+
+```
+[AgentNode] 检测到需要审批的工具：deleteJob
+[ApprovalService] 保存审批 Checkpoint：1234567890_123
+[ApprovalService] 审批 ID=1234567890_123, approved=true
+[ApprovalService] 恢复状态，执行工具
+```
+
+---
+
+## ⚠️ 常见问题
+
+### 1. Redis 连接失败
+
+**错误信息：**
+```
+Unable to connect to Redis; nested exception is io.lettuce.core.RedisConnectionException
+```
+
+**解决方案：**
+- 检查 Redis 是否启动：`redis-cli ping`
+- 检查配置：`spring.redis.host` 和 `spring.redis.port`
+- 检查防火墙
+
+### 2. OpenAI API 调用失败
+
+**错误信息：**
+```
+[OpenAI] 调用失败: 401 Unauthorized
+```
+
+**解决方案：**
+- 检查 API Key 是否正确：`openai.api.key`
+- 检查 API URL 是否可访问
+- 检查网络代理设置
+
+### 3. 工具未注册
+
+**错误信息：**
+```
+[ToolExecutor] 工具不存在: createJob
+```
+
+**解决方案：**
+- 检查 `ToolRegistry` 是否执行
+- 检查工具名称拼写
+- 检查日志：`[ToolRegistry] 工具注册完成`
+
+### 4. 审批超时
+
+**现象：**
+- 点击"确认执行"后提示 Checkpoint 不存在
+
+**原因：**
+- Checkpoint TTL 默认 10 分钟，超时自动删除
+
+**解决方案：**
+- 调整 `RedisCheckpoint` 中的 TTL
+- 或在超时前完成审批
+
+### 5. SSE 连接断开
+
+**现象：**
+- 前端接收不到流式数据
+
+**解决方案：**
+- 检查浏览器控制台是否有错误
+- 检查后端日志是否有异常
+- 尝试刷新页面重新连接
+
+---
+
+## 🔧 性能优化建议
+
+### 1. Redis 连接池
+
+```yaml
+spring:
+  redis:
+    lettuce:
+      pool:
+        max-active: 10
+        max-idle: 5
+        min-idle: 2
+```
+
+### 2. OpenAI 超时设置
+
+```java
+WebClient client = WebClient.builder()
+    .baseUrl(apiUrl)
+    .defaultHeader(...)
+    .build()
+    .mutate()
+    .responseTimeout(Duration.ofSeconds(30))  // 设置超时
+    .build();
+```
+
+### 3. 日志级别
+
+生产环境建议：
+
+```yaml
+logging:
+  level:
+    com.dataplatform: INFO
+    org.springframework: WARN
+```
+
+### 4. 监控指标
+
+建议监控：
+- OpenAI API 调用次数/成功率
+- 工具执行次数/耗时
+- 审批响应时间
+- Redis 连接状态
+
+---
+
+## 📊 生产环境建议
+
+### 1. 安全加固
+
+- [ ] OpenAI API Key 使用环境变量或密钥管理服务
+- [ ] Redis 启用密码认证
+- [ ] 添加 API 认证（JWT/OAuth）
+- [ ] 添加 API 限流（防止滥用）
+- [ ] 审批操作记录审计日志
+
+### 2. 高可用
+
+- [ ] Redis 主从/集群部署
+- [ ] 应用多实例部署（负载均衡）
+- [ ] 添加健康检查接口
+- [ ] 添加熔断降级（Circuit Breaker）
+
+### 3. 可观测性
+
+- [ ] 集成 Prometheus（指标采集）
+- [ ] 集成 Grafana（可视化）
+- [ ] 集成 ELK（日志聚合）
+- [ ] 添加链路追踪（Jaeger/Zipkin）
+
+### 4. 成本控制
+
+- [ ] 限制单次对话轮数
+- [ ] 限制工具调用次数
+- [ ] 缓存常见查询结果
+- [ ] 使用 gpt-3.5-turbo 代替 gpt-4（成本降低 90%）
+
+---
+
+## 📝 维护清单
+
+### 每日
+
+- [ ] 检查 Redis 内存使用率
+- [ ] 检查 OpenAI API 调用量
+- [ ] 检查错误日志
+
+### 每周
+
+- [ ] 清理过期 Checkpoint
+- [ ] 分析工具调用统计
+- [ ] 检查审批响应时间
+
+### 每月
+
+- [ ] 更新依赖版本（安全补丁）
+- [ ] 优化工具定义（提高识别准确率）
+- [ ] 评估 OpenAI 费用
+
+---
+
+## 🎯 下一步
+
+完成部署后，可以：
+
+1. **对接真实服务**：修改 `ToolRegistry` 中的工具实现
+2. **添加新工具**：参考 `STATEGRAPH_README.md` 扩展指南
+3. **定制审批流程**：修改 `AgentNode` 审批逻辑
+4. **优化提示词**：调整 `AgentNode` 的 System Prompt
+5. **集成前端**：将测试页面集成到实际应用
+
+---
+
+## 📞 技术支持
+
+如遇到问题，请检查：
+
+1. **日志文件**：`logs/application.log`
+2. **Redis 状态**：`redis-cli info`
+3. **网络连通性**：`curl https://api.openai.com/v1/models`
+4. **项目文档**：`STATEGRAPH_README.md`
+
+---
+
+祝您部署顺利！🎉

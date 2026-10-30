@@ -22,7 +22,7 @@ import java.util.Map;
  */
 @Tag(name = "AI会话管理")
 @RestController
-@RequestMapping("/api/conversations")
+@RequestMapping("/api/ai/conversations")
 @Slf4j
 @RequiredArgsConstructor
 public class ConversationController {

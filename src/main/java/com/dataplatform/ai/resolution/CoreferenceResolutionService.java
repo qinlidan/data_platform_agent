@@ -30,7 +30,6 @@ public class CoreferenceResolutionService {
             3. 如果用户消息是口语化模糊表达（"再查一遍"、"帮我看看"），结合历史归一成标准问法。
                - 例：上一轮在查作业3，这一轮说"再查一遍" → "查询作业ID为3的详情"
             4. 只输出改写后的问句，不要解释、不要加前缀（如"改写为："），不要输出其他内容。
-
             示例：
             [历史] 用户: 查询作业ID为3的作业
             [历史] 助手: 作业ID为3，名称为xxx，状态为运行中...
@@ -55,7 +54,6 @@ public class CoreferenceResolutionService {
 
         try {
             log.info("开始指代消解: conversationId={}, 原始消息={}", conversationId, userMessage);
-
             // 手动获取历史对话（只读，不写）
             List<Message> history = chatMemory.get(conversationId);
             String formattedHistory = formatHistory(history);

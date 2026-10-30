@@ -150,37 +150,21 @@ public class DataSourceTool {
     @Tool(description = """
         创建新数据源。根据提供的参数创建一个新的数据源。
 
-        参数：
+        参数：使用 DataSourceRequest 对象，包含：
         - sourceName: 数据源名称（必填）
         - sourceCode: 数据源编码（必填，唯一标识）
         - sourceType: 数据源类型（必填：MYSQL、POSTGRESQL、ORACLE、SQLSERVER、DB2、HIVE）
-        - jdbcUrl: JDBC连接URL（必填，例如：jdbc:mysql://localhost:3306/test）
+        - jdbcUrl: JDBC连接URL（必填）
         - username: 用户名（必填）
         - password: 密码（必填）
         - description: 描述（可选）
 
         返回：操作结果描述
         """)
-    public String createDataSource(
-            @ToolParam(description = "数据源名称") String sourceName,
-            @ToolParam(description = "数据源编码") String sourceCode,
-            @ToolParam(description = "数据源类型：MYSQL | POSTGRESQL | ORACLE | SQLSERVER | DB2 | HIVE") String sourceType,
-            @ToolParam(description = "JDBC连接URL") String jdbcUrl,
-            @ToolParam(description = "用户名") String username,
-            @ToolParam(description = "密码") String password,
-            @ToolParam(description = "描述") String description
-    ) {
+    public String createDataSource(@ToolParam(description = "数据源创建请求") DataSourceRequest request) {
         try {
-            log.info("[AI Tool] createDataSource - sourceName: {}, sourceCode: {}", sourceName, sourceCode);
-
-            DataSourceRequest request = new DataSourceRequest();
-            request.setSourceName(sourceName);
-            request.setSourceCode(sourceCode);
-            request.setSourceType(DataSourceType.valueOf(sourceType));
-            request.setJdbcUrl(jdbcUrl);
-            request.setUsername(username);
-            request.setPassword(password);
-            request.setDescription(description);
+            log.info("[AI Tool] createDataSource - sourceName: {}, sourceCode: {}",
+                    request.getSourceName(), request.getSourceCode());
 
             DataSource ds = dataSourceService.create(request);
             return String.format("数据源创建成功！数据源ID：%d，名称：%s，编码：%s",

@@ -65,16 +65,6 @@ public class GlobalExceptionHandler {
     /**
      * 业务异常
      */
-    @ExceptionHandler(BizException.class)
-    @ResponseStatus(HttpStatus.OK)
-    public Result<Void> handleBizException(BizException e) {
-        log.error("业务异常: {}", e.getMessage(), e);
-        return Result.error(e.getCode(), e.getMessage());
-    }
-
-    /**
-     * 业务异常
-     */
     @ExceptionHandler(BusinessException.class)
     @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleBusinessException(BusinessException e) {

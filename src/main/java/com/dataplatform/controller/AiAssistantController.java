@@ -187,7 +187,7 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(
         String originalMessage = message;
         String resolvedMessage = coreferenceResolutionService.resolveAndRewrite(
                 originalMessage,
-                "conv-" + finalConversationId
+                String.valueOf(finalConversationId)  // 使用纯数字 conversationId，与主对话一致
         );
         log.info("指代消解: conversationId={}, 原始='{}', 改写='{}'",
                 finalConversationId, originalMessage, resolvedMessage);

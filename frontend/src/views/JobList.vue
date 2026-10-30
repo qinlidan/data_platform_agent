@@ -9,7 +9,6 @@
           <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 150px">
             <el-option label="草稿" value="DRAFT" />
             <el-option label="已发布" value="PUBLISHED" />
-            <el-option label="已归档" value="ARCHIVED" />
           </el-select>
         </el-form-item>
 
@@ -154,15 +153,6 @@
             </el-button>
             <el-button
               link
-              type="warning"
-              size="small"
-              @click="handleArchive(row)"
-              :disabled="row.status !== 'PUBLISHED'"
-            >
-              归档
-            </el-button>
-            <el-button
-              link
               type="danger"
               size="small"
               @click="handleDelete(row)"
@@ -280,6 +270,24 @@
               </div>
               <!-- 普通文本消息 -->
               <div v-else class="message-text" v-html="formatMessage(msg.content)"></div>
+
+              <!-- 确认按钮 -->
+              <div v-if="msg.needConfirmation" class="confirmation-actions">
+                <el-alert type="warning" :closable="false" style="margin-top: 12px; margin-bottom: 12px">
+                  <template #title>
+                    <strong>⚠️ 危险操作需要确认</strong>
+                  </template>
+                  {{ msg.confirmationMessage }}
+                </el-alert>
+                <el-button type="danger" size="small" @click="handleConfirm(msg)">
+                  <el-icon><Check /></el-icon>
+                  确认删除
+                </el-button>
+                <el-button size="small" @click="handleCancel(msg)">
+                  <el-icon><Close /></el-icon>
+                  取消
+                </el-button>
+              </div>
             </div>
           </div>
 
@@ -337,7 +345,7 @@
 import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Right, ChatDotRound, User, Tools } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Right, ChatDotRound, User, Tools, Check, Close } from '@element-plus/icons-vue'
 import { jobApi } from '@/api'
 import request from '@/utils/request'
 import JobCreateDialog from './JobCreateDialog.vue'
@@ -375,8 +383,7 @@ const editJobId = ref(null)
 // 状态映射
 const statusMap = {
   DRAFT: '草稿',
-  PUBLISHED: '已发布',
-  ARCHIVED: '已归档'
+  PUBLISHED: '已发布'
 }
 
 const frequencyMap = {
@@ -487,27 +494,6 @@ const handlePublish = async (row) => {
   }
 }
 
-// 归档
-const handleArchive = async (row) => {
-  try {
-    await ElMessageBox.confirm(
-      `确定要归档作业"${row.jobName}"吗？归档后作业将停止运行。`,
-      '归档确认',
-      {
-        type: 'warning'
-      }
-    )
-
-    await jobApi.archiveJob(row.id)
-    ElMessage.success('归档成功')
-    getList()
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('归档失败', error)
-    }
-  }
-}
-
 // 删除
 const handleDelete = async (row) => {
   try {
@@ -558,6 +544,7 @@ const messagesContainer = ref(null)
 
 let eventSource = null; // 把实例提升到外部，全局保存，每次发送前关闭旧连接
 let isFinished = false; // 标记：SSE 是否正常结束（收到 done 事件）
+let pendingConfirmationToken = null; // 存储待确认的 token
 
 // 发送消息（流式输出）
 const sendMessage = async () => {
@@ -586,7 +573,10 @@ const sendMessage = async () => {
     content: '',
     isJobList: false,
     jobListData: null,
-    toolCalls: [] // 新增：记录工具调用轨迹
+    toolCalls: [], // 新增：记录工具调用轨迹
+    needConfirmation: false, // 是否需要确认
+    confirmationMessage: '', // 确认提示信息
+    confirmationToolName: '' // 需要确认的工具名称
   })
   messages.value.push(assistantMessage)
 
@@ -688,6 +678,29 @@ const sendMessage = async () => {
       }
     })
 
+    // 监听 confirmation_required 事件：需要二次确认
+    eventSource.addEventListener('confirmation_required', (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        console.log('🔔 收到二次确认请求:', data)
+
+        // 存储 token
+        pendingConfirmationToken = data.confirmationToken
+
+        // 设置消息需要确认
+        assistantMessage.needConfirmation = true
+        assistantMessage.confirmationMessage = data.message || '此操作需要确认，请选择是否继续'
+        assistantMessage.confirmationToolName = data.toolName
+
+        // 添加警告文本
+        assistantMessage.content += `\n\n⚠️ ${data.message || '此操作需要二次确认'}\n`
+
+        scrollToBottom()
+      } catch (err) {
+        console.error('解析 confirmation_required 事件失败:', err)
+      }
+    })
+
     // 监听 error 事件（自定义）
     eventSource.addEventListener('error_event', (e) => {
       try {
@@ -764,6 +777,126 @@ const scrollToBottom = () => {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
     }
   })
+}
+
+// 处理确认操作
+const handleConfirm = async (msg) => {
+  if (!pendingConfirmationToken) {
+    ElMessage.error('确认令牌已过期，请重新操作')
+    return
+  }
+
+  // 隐藏确认按钮
+  msg.needConfirmation = false
+
+  // 添加用户确认消息
+  messages.value.push({
+    role: 'user',
+    content: '✅ 已确认执行'
+  })
+
+  // 创建新的 AI 回复消息
+  const confirmMessage = reactive({
+    role: 'assistant',
+    content: '',
+    isJobList: false,
+    jobListData: null,
+    toolCalls: []
+  })
+  messages.value.push(confirmMessage)
+
+  scrollToBottom()
+  aiLoading.value = true
+
+  const token = pendingConfirmationToken
+  pendingConfirmationToken = null  // 清除 token
+
+  try {
+    // 使用 fetch 发送带 token 的请求
+    const response = await fetch(
+      `/api/ai/chat/stream?message=${encodeURIComponent('继续执行删除')}`,
+      {
+        method: 'GET',
+        headers: {
+          'X-Confirmation-Token': token
+        }
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    // 手动解析 SSE 流
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        if (line.startsWith('event:')) {
+          const eventType = line.substring(6).trim()
+          continue
+        }
+
+        if (line.startsWith('data:')) {
+          const data = line.substring(5).trim()
+          if (!data) continue
+
+          try {
+            const parsed = JSON.parse(data)
+
+            // 根据前一个 event 类型处理
+            if (parsed.content) {
+              confirmMessage.content += parsed.content
+              scrollToBottom()
+            }
+          } catch (e) {
+            console.error('解析 SSE 数据失败:', e, data)
+          }
+        }
+      }
+    }
+
+    aiLoading.value = false
+    getList() // 刷新作业列表
+
+  } catch (error) {
+    console.error('确认请求失败:', error)
+    confirmMessage.content = `❌ 执行失败：${error.message}`
+    ElMessage.error('操作执行失败')
+  } finally {
+    aiLoading.value = false
+    scrollToBottom()
+  }
+}
+
+// 处理取消操作
+const handleCancel = (msg) => {
+  // 清除 token
+  pendingConfirmationToken = null
+
+  // 隐藏确认按钮
+  msg.needConfirmation = false
+
+  messages.value.push({
+    role: 'user',
+    content: '❌ 已取消操作'
+  })
+
+  messages.value.push({
+    role: 'assistant',
+    content: '操作已取消。'
+  })
+
+  scrollToBottom()
 }
 
 </script>

@@ -123,3 +123,18 @@ ai:
     api-key: ${DEEPSEEK_API_KEY}
     base-url: https://api.deepseek.com
     model: deepseek-chat
+tool:
+   governance:
+     permission:
+       deleteJob: []
+       publishJob: []
+     confirmation:
+       enabled: true
+       tools: [deleteJob, publishJob]
+     timeout:
+       default: 30000
+       per-tool:
+         executeSQL: 60000
+     retry:
+       enabled: true
+       max-attempts: 1

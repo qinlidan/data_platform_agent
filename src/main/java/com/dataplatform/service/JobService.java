@@ -14,17 +14,17 @@ public interface JobService {
     /**
      * 创建作业
      */
-    Job create(JobCreateRequest request);
+    Job create(JobCreateRequest request, String creatorUserId);
 
     /**
-     * 更新作业
+     * 更新作业（仅创建者可操作）
      */
-    Job update(Long id, JobUpdateRequest request);
+    Job update(Long id, JobUpdateRequest request, String operatorUserId);
 
     /**
-     * 删除作业
+     * 删除作业（仅创建者可操作）
      */
-    void delete(Long id);
+    void delete(Long id, String operatorUserId);
 
     /**
      * 根据ID查询作业
@@ -37,12 +37,12 @@ public interface JobService {
     Page<Job> page(JobQueryRequest request);
 
     /**
-     * 发布作业
+     * 发布作业（仅创建者可操作）
      */
-    void publish(Long id, Integer version);
+    void publish(Long id, Integer version, String operatorUserId);
 
     /**
-     * 归档作业
+     * 归档作业（仅创建者可操作）
      */
-    void archive(Long id);
+    void archive(Long id, String operatorUserId);
 }

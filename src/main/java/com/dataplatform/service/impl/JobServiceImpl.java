@@ -36,9 +36,26 @@ public class JobServiceImpl implements JobService {
     private final DataSourceService dataSourceService;
     private final FieldMetadataService fieldMetadataService;
 
+    /**
+     * 检查操作权限（仅创建者可操作）
+     */
+    private void checkOwnership(Job job, String operatorUserId, String operation) {
+        if (job.getCreatorId() == null) {
+            // 旧数据没有创建者信息，允许操作（降级策略）
+            return;
+        }
+
+        if (!job.getCreatorId().equals(operatorUserId)) {
+            throw new BusinessException(
+                    String.format("无权限%s：该作业由用户 %s 创建，只有创建者可以操作",
+                            operation, job.getCreatorId())
+            );
+        }
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Job create(JobCreateRequest request) {
+    public Job create(JobCreateRequest request, String creatorUserId) {
         // 检查作业名称是否重复
         LambdaQueryWrapper<Job> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Job::getJobName, request.getJobName());
@@ -71,6 +88,7 @@ public class JobServiceImpl implements JobService {
         BeanUtils.copyProperties(request, job);
         job.setStatus(JobStatus.DRAFT);
         job.setCurrentVersion(0);
+        job.setCreatorId(creatorUserId); // 设置创建者ID
 
         jobMapper.insert(job);
 
@@ -94,9 +112,12 @@ public class JobServiceImpl implements JobService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Job update(Long id, JobUpdateRequest request) {
+    public Job update(Long id, JobUpdateRequest request, String operatorUserId) {
         // 检查作业是否存在
         Job job = getById(id);
+
+        // 检查操作权限
+        checkOwnership(job, operatorUserId, "修改作业");
 
         // 检查作业状态（已发布的作业不能直接修改基本信息）
         if (job.getStatus() == JobStatus.PUBLISHED) {
@@ -149,9 +170,12 @@ public class JobServiceImpl implements JobService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void delete(Long id) {
+    public void delete(Long id, String operatorUserId) {
         // 检查作业是否存在
         Job job = getById(id);
+
+        // 检查操作权限
+        checkOwnership(job, operatorUserId, "删除作业");
 
         // 检查作业状态（已发布的作业不能删除，需要先归档）
         if (job.getStatus() == JobStatus.PUBLISHED) {
@@ -226,9 +250,12 @@ public class JobServiceImpl implements JobService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void publish(Long id, Integer version) {
+    public void publish(Long id, Integer version, String operatorUserId) {
         // 检查作业是否存在
         Job job = getById(id);
+
+        // 检查操作权限
+        checkOwnership(job, operatorUserId, "发布作业");
 
         // 检查版本是否存在
         LambdaQueryWrapper<JobVersion> wrapper = new LambdaQueryWrapper<>();
@@ -270,9 +297,12 @@ public class JobServiceImpl implements JobService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void archive(Long id) {
+    public void archive(Long id, String operatorUserId) {
         // 检查作业是否存在
         Job job = getById(id);
+
+        // 检查操作权限
+        checkOwnership(job, operatorUserId, "归档作业");
 
         // 更新作业状态
         job.setStatus(JobStatus.ARCHIVED);
