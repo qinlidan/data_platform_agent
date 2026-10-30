@@ -157,7 +157,12 @@ public class JobTool {
 
             emit("table_end", Map.of());
 
-            return String.format("查询到 %d 条作业记录", jobs.size());
+            // 构造作业ID列表，供大模型后续指代消解
+            String jobIdList = jobs.stream()
+                    .map(job -> String.format("ID=%d(%s)", job.getId(), job.getJobCnName()))
+                    .collect(Collectors.joining(", "));
+
+            return String.format("查询到 %d 条作业记录：%s", jobs.size(), jobIdList);
         } catch (Exception e) {
             log.error("[AI Tool] listRecentJobs 失败", e);
             return "查询失败：" + e.getMessage();
@@ -218,7 +223,12 @@ public class JobTool {
 
             emit("table_end", Map.of());
 
-            return String.format("找到 %d 条符合条件的作业", jobs.size());
+            // 构造作业ID列表，供大模型后续指代消解
+            String jobIdList = jobs.stream()
+                    .map(job -> String.format("ID=%d(%s)", job.getId(), job.getJobCnName()))
+                    .collect(Collectors.joining(", "));
+
+            return String.format("找到 %d 条符合条件的作业：%s", jobs.size(), jobIdList);
         } catch (Exception e) {
             log.error("[AI Tool] searchJobs 失败", e);
             return "搜索失败：" + e.getMessage();
