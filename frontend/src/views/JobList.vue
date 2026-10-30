@@ -534,6 +534,8 @@ const handleSuccess = () => {
 onMounted(() => {
   getList()
   loadDatasources()
+  // 加载已保存的会话ID
+  conversationId.value = loadConversationId()
 })
 
 // ========== AI 助手相关 ==========
@@ -541,6 +543,55 @@ const messages = ref([])
 const inputMessage = ref('')
 const aiLoading = ref(false)
 const messagesContainer = ref(null)
+const conversationId = ref(null) // 存储会话ID
+
+// 从 localStorage 加载 conversationId（带过期检查）
+const loadConversationId = () => {
+  try {
+    const id = localStorage.getItem('ai_conversation_id')
+    const expires = localStorage.getItem('ai_conversation_id_expires')
+
+    if (!id || !expires) {
+      return null
+    }
+
+    // 检查是否过期（7天）
+    const expiresTime = parseInt(expires)
+    if (Date.now() > expiresTime) {
+      // 已过期，清除
+      localStorage.removeItem('ai_conversation_id')
+      localStorage.removeItem('ai_conversation_id_expires')
+      console.log('🔄 会话ID已过期，已清除')
+      return null
+    }
+
+    console.log('✅ 从 localStorage 加载会话ID:', id)
+    return id
+  } catch (err) {
+    console.error('加载会话ID失败:', err)
+    return null
+  }
+}
+
+// 保存 conversationId 到 localStorage（7天过期）
+const saveConversationId = (id) => {
+  try {
+    const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000 // 7天后过期
+    localStorage.setItem('ai_conversation_id', id)
+    localStorage.setItem('ai_conversation_id_expires', expiresAt.toString())
+    console.log('✅ 保存会话ID到 localStorage:', id, '过期时间:', new Date(expiresAt).toLocaleString())
+  } catch (err) {
+    console.error('保存会话ID失败:', err)
+  }
+}
+
+// 清除 conversationId
+const clearConversationId = () => {
+  localStorage.removeItem('ai_conversation_id')
+  localStorage.removeItem('ai_conversation_id_expires')
+  conversationId.value = null
+  console.log('🔄 已清除会话ID')
+}
 
 let eventSource = null; // 把实例提升到外部，全局保存，每次发送前关闭旧连接
 let isFinished = false; // 标记：SSE 是否正常结束（收到 done 事件）
@@ -583,10 +634,14 @@ const sendMessage = async () => {
 
   try {
     console.log('使用 EventSource 建立 SSE 连接')
+    // 构建URL，带上 conversationId（如果有的话）
+    let url = `/api/ai/chat/stream?message=${encodeURIComponent(userMessage)}`
+    if (conversationId.value) {
+      url += `&conversationId=${conversationId.value}`
+    }
+
     // 使用 EventSource 建立 SSE 连接
-     eventSource = new EventSource(
-      `/api/ai/chat/stream?message=${encodeURIComponent(userMessage)}`
-    )
+    eventSource = new EventSource(url)
 
     //  添加：监听连接打开事件
     eventSource.onopen = (e) => {
@@ -597,6 +652,20 @@ const sendMessage = async () => {
     eventSource.onmessage = (e) => {
       console.warn('收到默认 message 事件（不应该出现）:', e.data)
     }
+
+    // 监听 conversation_id 事件：保存会话ID
+    eventSource.addEventListener('conversation_id', (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        if (data.conversationId) {
+          conversationId.value = data.conversationId
+          saveConversationId(data.conversationId) // 保存到 localStorage
+          console.log('✅ 保存会话ID:', conversationId.value)
+        }
+      } catch (err) {
+        console.error('解析 conversation_id 事件失败:', err)
+      }
+    })
 
     // 监听 text 事件：逐字追加文本
     eventSource.addEventListener('text', (e) => {
@@ -742,6 +811,8 @@ eventSource.onerror = (error) => {
 // 清空消息
 const clearMessages = () => {
   messages.value = []
+  clearConversationId() // 清空会话ID（同时清除 localStorage）
+  console.log('🔄 已清空对话和会话ID')
 }
 
 // 工具名称映射（中文描述）
@@ -812,16 +883,19 @@ const handleConfirm = async (msg) => {
   pendingConfirmationToken = null  // 清除 token
 
   try {
+    // 构建URL，带上 conversationId
+    let url = `/api/ai/chat/stream?message=${encodeURIComponent('继续执行删除')}`
+    if (conversationId.value) {
+      url += `&conversationId=${conversationId.value}`
+    }
+
     // 使用 fetch 发送带 token 的请求
-    const response = await fetch(
-      `/api/ai/chat/stream?message=${encodeURIComponent('继续执行删除')}`,
-      {
-        method: 'GET',
-        headers: {
-          'X-Confirmation-Token': token
-        }
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'X-Confirmation-Token': token
       }
-    )
+    })
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
