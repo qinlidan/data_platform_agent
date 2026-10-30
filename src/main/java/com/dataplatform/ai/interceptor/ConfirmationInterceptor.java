@@ -52,6 +52,13 @@ public class ConfirmationInterceptor implements ToolInterceptor {
     public String intercept(ToolExecutionContext context, InterceptorChain chain) throws Exception {
         String toolName = context.getToolName();
 
+        // 🔥 DEBUG: 打印所有进入拦截器的工具调用
+        log.info("[ConfirmationInterceptor] 拦截工具调用: toolName={}, hasToken={}, enabled={}, requiredTools={}",
+                toolName,
+                context.getConfirmationToken() != null,
+                properties.getConfirmation().isEnabled(),
+                properties.getConfirmation().getTools());
+
         // 检查是否启用确认功能
         if (!properties.getConfirmation().isEnabled()) {
             return chain.proceed(context);
