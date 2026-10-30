@@ -2,16 +2,20 @@ package com.dataplatform.ai.resolution;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 public class CoreferenceResolutionService {
 
     private final ChatClient resolutionChatClient;
+    private final ChatMemory chatMemory;
 
     private static final String RESOLUTION_SYSTEM_PROMPT = """
             你是一个对话指代消解助手。
@@ -38,9 +42,9 @@ public class CoreferenceResolutionService {
             """;
 
     public CoreferenceResolutionService(ChatModel chatModel, ChatMemory chatMemory) {
-        this.resolutionChatClient = ChatClient.builder(chatModel)
-                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                .build();
+        this.chatMemory = chatMemory;
+        // 不使用 MessageChatMemoryAdvisor，避免污染主对话历史
+        this.resolutionChatClient = ChatClient.builder(chatModel).build();
     }
 
     public String resolveAndRewrite(String userMessage, String conversationId) {
@@ -52,10 +56,22 @@ public class CoreferenceResolutionService {
         try {
             log.info("开始指代消解: conversationId={}, 原始消息={}", conversationId, userMessage);
 
+            // 手动获取历史对话（只读，不写）
+            List<Message> history = chatMemory.get(conversationId);
+            String formattedHistory = formatHistory(history);
+
+            // 构造 prompt：历史 + 当前输入
             String resolved = resolutionChatClient.prompt()
                     .system(RESOLUTION_SYSTEM_PROMPT)
-                    .user(userMessage)
-                    .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
+                    .user("""
+                            【历史对话】
+                            %s
+
+                            【当前用户输入】
+                            %s
+                            """.formatted(
+                            formattedHistory.isEmpty() ? "（无历史）" : formattedHistory,
+                            userMessage))
                     .call()
                     .content();
 
@@ -73,5 +89,26 @@ public class CoreferenceResolutionService {
             log.error("指代消解失败，降级返回原始消息: {}", e.getMessage());
             return userMessage;  // 降级策略
         }
+    }
+
+    /**
+     * 格式化历史对话
+     * 格式: 用户: xxx\n助手: yyy\n...
+     */
+    private String formatHistory(List<Message> history) {
+        if (history == null || history.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (Message msg : history) {
+            String role = switch (msg.getMessageType()) {
+                case USER -> "用户";
+                case ASSISTANT -> "助手";
+                default -> "系统";
+            };
+            sb.append(role).append(": ").append(msg.getText()).append("\n");
+        }
+        return sb.toString().trim();
     }
 }
