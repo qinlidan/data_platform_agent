@@ -1,12 +1,13 @@
 package com.dataplatform.controller;
 
-import com.dataplatform.ai.ToolRegistry;
-import com.dataplatform.ai.confirmation.NeedConfirmationException;
+import com.dataplatform.ai.ToolMonitorConfig;
+import com.dataplatform.ai.confirmation.ConfirmationService;
 import com.dataplatform.ai.event.MessageSaveEvent;
+import com.dataplatform.ai.executor.ToolExecutor;
+import com.dataplatform.ai.resolution.CoreferenceResolutionService;
 import com.dataplatform.ai.tools.DataSourceTool;
 import com.dataplatform.ai.tools.FaqTool;
 import com.dataplatform.ai.tools.JobTool;
-import com.dataplatform.ai.validation.ToolValidator;
 import com.dataplatform.common.ApiResponse;
 import com.dataplatform.service.DataSourceService;
 import com.dataplatform.service.FaqService;
@@ -56,8 +57,11 @@ public class AiAssistantController {
     private final SystemPromptTemplate pureConversationSystemPrompt;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final com.dataplatform.service.ConversationService conversationService;
+    private final com.dataplatform.service.MessageService messageService;
     private final ApplicationEventPublisher eventPublisher;
-    private final ToolRegistry toolRegistry;
+    private final ToolExecutor toolExecutor;
+    private final ConfirmationService confirmationService;
+    private final CoreferenceResolutionService coreferenceResolutionService;
 
     public AiAssistantController(
             ChatModel chatModel,
@@ -67,8 +71,11 @@ public class AiAssistantController {
             ChatMemory chatMemory,
             @Qualifier("pureConversationSystemPrompt") SystemPromptTemplate pureConversationSystemPrompt,
             com.dataplatform.service.ConversationService conversationService,
+            com.dataplatform.service.MessageService messageService,
             ApplicationEventPublisher eventPublisher,
-            ToolRegistry toolRegistry
+            ToolExecutor toolExecutor,
+            ConfirmationService confirmationService,
+            CoreferenceResolutionService coreferenceResolutionService
     ) {
         this.chatModel = chatModel;
         this.jobService = jobService;
@@ -77,8 +84,11 @@ public class AiAssistantController {
         this.chatMemory = chatMemory;
         this.pureConversationSystemPrompt = pureConversationSystemPrompt;
         this.conversationService = conversationService;
+        this.messageService = messageService;
         this.eventPublisher = eventPublisher;
-        this.toolRegistry = toolRegistry;
+        this.toolExecutor = toolExecutor;
+        this.confirmationService = confirmationService;
+        this.coreferenceResolutionService = coreferenceResolutionService;
     }
 
     @Operation(summary = "AI对话 - 自然语言创建/管理作业")
@@ -111,6 +121,7 @@ public class AiAssistantController {
             String response = client.prompt()
                     .system(SYSTEM_PROMPT)
                     .user(userMessage)
+                    .toolContext(Map.of("userId", userId))  // 传递 userId 到工具
                     .call()
                     .content();
 
@@ -133,11 +144,22 @@ public class AiAssistantController {
     }
 
     @Operation(summary = "AI 对话流式输出 - SSE（支持逐行表格渲染 + 工具调用可见）")
-@GetMapping(value = "/chat/stream")
+    @GetMapping(value = "/conversations/{conversationId}/chat/stream")
+    public Flux<ServerSentEvent<Map<String, Object>>> chatStreamByConversation(
+            @PathVariable Long conversationId,
+            @RequestParam String message,
+            @RequestParam(required = false, defaultValue = "anonymous") String userId,
+            @RequestHeader(value = "X-Confirmation-Token", required = false) String confirmationToken
+    ) {
+        return chatStream(message, userId, conversationId, confirmationToken);
+    }
+
+    @GetMapping(value = "/chat/stream")
 public Flux<ServerSentEvent<Map<String, Object>>> chatStream(
         @RequestParam String message,
         @RequestParam(required = false, defaultValue = "anonymous") String userId,
-        @RequestParam(required = false) Long conversationId
+        @RequestParam(required = false) Long conversationId,
+        @RequestHeader(value = "X-Confirmation-Token", required = false) String confirmationToken
 ) {
     if (message == null || message.trim().isEmpty()) {
         return Flux.just(ServerSentEvent.<Map<String, Object>>builder()
@@ -147,8 +169,8 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(
     }
 
     try {
-        log.info("收到用户消息（流式）：{}, userId: {}, conversationId: {}", message, userId, conversationId);
-
+        log.info("收到用户消息（流式）：{}, userId: {}, conversationId: {}, hasToken: {}",
+                message, userId, conversationId, confirmationToken != null);
         // 获取或创建会话
         if (conversationId == null) {
             // 首次对话，创建新会话
@@ -161,8 +183,17 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(
 
         final Long finalConversationId = conversationId;
 
-        // 异步落表：用户消息
-        eventPublisher.publishEvent(new MessageSaveEvent(this, finalConversationId, "user", message));
+        // 指代消解：改写用户消息
+        String originalMessage = message;
+        String resolvedMessage = coreferenceResolutionService.resolveAndRewrite(
+                originalMessage,
+                "conv-" + finalConversationId
+        );
+        log.info("指代消解: conversationId={}, 原始='{}', 改写='{}'",
+                finalConversationId, originalMessage, resolvedMessage);
+
+        // 异步落表：用户消息（保存原始消息）
+        eventPublisher.publishEvent(new MessageSaveEvent(this, finalConversationId, "user", originalMessage));
 
         // 为当前请求创建独立的 UI 事件通道
         Sinks.Many<Map<String, Object>> uiEventSink = Sinks.many().unicast().onBackpressureBuffer();
@@ -173,13 +204,8 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(
         DataSourceTool dataSourceTool = new DataSourceTool(dataSourceService);
         FaqTool faqTool = new FaqTool(faqService);
 
-        // 使用注册表创建包装后的工具（启动时已扫描，零反射）
-        ToolCallback[] monitoredTools = toolRegistry.createWrappedCallbacks(
-                uiEventSink,
-                "jobTool",
-                "dataSourceTool",
-                "faqTool"
-        );
+        // 使用 ToolMonitorConfig 直接包装工具（集成拦截器链）
+        ToolCallback[] monitoredTools = ToolMonitorConfig.wrapTools(uiEventSink, toolExecutor, jobTool, dataSourceTool, faqTool);
 
         // 使用 ChatClient.Builder，传入包装后的工具回调
         ChatClient chatClient = ChatClient.builder(chatModel)
@@ -193,7 +219,8 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(
         // 文本流：模型逐 token 生成，在 prompt() 时绑定 conversationId
         Flux<ServerSentEvent<Map<String, Object>>> textStream = chatClient.prompt()
                 .system(SYSTEM_PROMPT)
-                .user(message)
+                .user(resolvedMessage)  // 使用改写后的消息
+                .toolContext(buildToolContext(userId, confirmationToken))  // 传递 userId 和 confirmationToken
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, String.valueOf(finalConversationId)))
                 .stream()
                 .chatResponse()
@@ -229,38 +256,7 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(
                     String eventName = (String) event.get("event");
                     Object payload = event.get("payload");
 
-                    // 异步落表：工具调用开始（记录工具名和参数）
-                    if ("tool_start".equals(eventName) && payload instanceof Map) {
-                        Map<String, Object> toolPayload = (Map<String, Object>) payload;
-                        String toolName = (String) toolPayload.get("toolName");
-                        String toolCallId = (String) toolPayload.get("toolCallId");
-                        Object arguments = toolPayload.get("arguments");
-
-                        if (toolName != null) {
-                            String toolCallContent = String.format("[调用工具] %s\n参数: %s",
-                                toolName, arguments != null ? arguments.toString() : "{}");
-                            eventPublisher.publishEvent(new MessageSaveEvent(
-                                this, finalConversationId, "tool", toolCallContent, toolName, toolCallId
-                            ));
-                        }
-                    }
-
-                    // 异步落表：工具结果
-                    if ("tool_end".equals(eventName) && payload instanceof Map) {
-                        Map<String, Object> toolPayload = (Map<String, Object>) payload;
-                        String toolCallId = (String) toolPayload.get("toolCallId");
-                        Boolean success = (Boolean) toolPayload.get("success");
-                        String result = (String) toolPayload.get("result");
-                        String error = (String) toolPayload.get("error");
-
-                        if (toolCallId != null) {
-                            String toolResult = success ? result : ("Error: " + error);
-                            eventPublisher.publishEvent(new MessageSaveEvent(
-                                this, finalConversationId, "tool", toolResult, null, toolCallId
-                            ));
-                        }
-                    }
-
+                    // 只转发事件到前端，不落库 tool 结果
                     return ServerSentEvent.<Map<String, Object>>builder()
                             .event(eventName)
                             .data((Map<String, Object>) payload)
@@ -282,27 +278,25 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(
                         .build()))
                 .onErrorResume(e -> {
                     log.error("AI 对话流式失败", e);
+                    // 返回错误事件到前端
+                    Map<String, Object> errorData = new HashMap<>();
+                    errorData.put("message", e.getMessage() != null ? e.getMessage() : "AI对话失败");
+                    errorData.put("type", e.getClass().getSimpleName());
+
                     return Flux.just(ServerSentEvent.<Map<String, Object>>builder()
                             .event("error")
-                            .data(Map.of("message", "AI对话失败：" + e.getMessage()))
+                            .data(errorData)
                             .build());
                 });
-    } catch (NeedConfirmationException e) {
-        log.warn("[Confirmation Required] {}", e.getMessage());
-        return Flux.just(ServerSentEvent.<Map<String, Object>>builder()
-                .event("confirmation_required")
-                .data(Map.of(
-                        "operation", e.getOperation(),
-                        "riskLevel", e.getRiskLevel(),
-                        "confirmationToken", e.getConfirmationToken(),
-                        "message", e.getMessage()
-                ))
-                .build());
     } catch (Exception e) {
         log.error("AI 对话流式失败", e);
+        Map<String, Object> errorData = new HashMap<>();
+        errorData.put("message", e.getMessage() != null ? e.getMessage() : "AI对话失败");
+        errorData.put("type", e.getClass().getSimpleName());
+
         return Flux.just(ServerSentEvent.<Map<String, Object>>builder()
                 .event("error")
-                .data(Map.of("message", "AI对话失败：" + e.getMessage()))
+                .data(errorData)
                 .build());
     }
 }
@@ -404,19 +398,38 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(
             return textStream.concatWith(doneEvent)
                     .onErrorResume(e -> {
                         log.error("[纯对话流式] 失败", e);
+                        Map<String, Object> errorData = new HashMap<>();
+                        errorData.put("message", e.getMessage() != null ? e.getMessage() : "对话失败");
+                        errorData.put("type", e.getClass().getSimpleName());
+
                         return Flux.just(ServerSentEvent.<Map<String, Object>>builder()
                                 .event("error")
-                                .data(Map.of("message", "对话失败：" + e.getMessage()))
+                                .data(errorData)
                                 .build());
                     });
 
         } catch (Exception e) {
             log.error("[纯对话流式] 失败", e);
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("message", e.getMessage() != null ? e.getMessage() : "对话失败");
+            errorData.put("type", e.getClass().getSimpleName());
+
             return Flux.just(ServerSentEvent.<Map<String, Object>>builder()
                     .event("error")
-                    .data(Map.of("message", "对话失败：" + e.getMessage()))
+                    .data(errorData)
                     .build());
         }
+    }
+    /**
+     * 构建工具上下文（包含用户信息和确认令牌）
+     */
+    private Map<String, Object> buildToolContext(String userId, String confirmationToken) {
+        Map<String, Object> context = new HashMap<>();
+        context.put("userId", userId);
+        if (confirmationToken != null && !confirmationToken.isEmpty()) {
+            context.put("confirmationToken", confirmationToken);
+        }
+        return context;
     }
 
     private static final String SYSTEM_PROMPT = """
@@ -452,9 +465,10 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(
             2. 如果用户没有提供作业名称，根据表名自动生成。
             3. 目标表名（targetTable）会自动设置为作业编码（jobCode），createJob 时传 null 或空字符串即可。
             4. 如果缺少必要参数（如源数据源编码），先询问用户，不要编造。
-            5. 删除和发布作业必须二次确认：
-               - 先调用 deleteJob/publishJob/deleteDataSource 并传 confirmed=false，拿到确认提示后向用户说明风险；
-               - 用户明确同意后，再调用一次并传 confirmed=true 执行。
+            5. 删除和发布等危险操作需要二次确认：
+               - 系统会自动弹出确认按钮供用户点击
+               - 你需要明确告知用户"请点击确认按钮以继续操作"，不要说"回复确认删除"
+               - 用户点击确认后，操作将自动执行
             6. 查询类工具（listRecentJobs、searchJobs）会以表格形式流式推送到前端，你只需返回简单的摘要文字。
             7. 查询某个作业的数据源信息时：先调用 getJobDetails 获取数据源ID，再调用 getDataSourceDetails 获取详情，不要调用 searchDataSources 或 listAllDataSources。
             8. searchDataSources 和 listAllDataSources 只用于"搜索数据源"或"列出所有数据源"这类场景，不要用于查询某个作业的数据源。
