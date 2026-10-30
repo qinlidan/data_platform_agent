@@ -653,14 +653,18 @@ const sendMessage = async () => {
       console.warn('收到默认 message 事件（不应该出现）:', e.data)
     }
 
-    // 监听 conversation_id 事件：保存会话ID
+    // 监听 conversation_id 事件：保存会话ID（仅首次对话）
     eventSource.addEventListener('conversation_id', (e) => {
       try {
         const data = JSON.parse(e.data)
-        if (data.conversationId) {
+        // 🔥 关键：只有当前没有 conversationId 时，才保存后端返回的新ID
+        // 如果已经有 conversationId（从 localStorage 加载或上次对话保存），不覆盖
+        if (data.conversationId && !conversationId.value) {
           conversationId.value = data.conversationId
           saveConversationId(data.conversationId) // 保存到 localStorage
-          console.log('✅ 保存会话ID:', conversationId.value)
+          console.log('✅ 保存新会话ID:', conversationId.value)
+        } else if (conversationId.value) {
+          console.log('ℹ️ 已有会话ID，跳过保存:', conversationId.value)
         }
       } catch (err) {
         console.error('解析 conversation_id 事件失败:', err)
