@@ -17,6 +17,7 @@ import com.dataplatform.service.DataSourceService;
 import com.dataplatform.service.FieldMetadataService;
 import com.dataplatform.service.JobService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ import java.util.List;
 /**
  * 作业服务实现类
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class JobServiceImpl implements JobService {
@@ -322,6 +324,7 @@ public class JobServiceImpl implements JobService {
             return;
         }
 
+        log.info("[fillCurrentVersionIds] 开始填充 {} 个作业的版本ID", jobs.size());
         for (Job job : jobs) {
             if (job.getCurrentVersion() != null) {
                 LambdaQueryWrapper<JobVersion> wrapper = new LambdaQueryWrapper<>();
@@ -331,6 +334,11 @@ public class JobServiceImpl implements JobService {
                 JobVersion version = jobVersionMapper.selectOne(wrapper);
                 if (version != null) {
                     job.setCurrentVersionId(version.getId());
+                    log.info("[fillCurrentVersionIds] job_id={}, current_version={}, current_version_id={}",
+                             job.getId(), job.getCurrentVersion(), version.getId());
+                } else {
+                    log.warn("[fillCurrentVersionIds] 未找到版本：job_id={}, current_version={}",
+                             job.getId(), job.getCurrentVersion());
                 }
             }
         }
