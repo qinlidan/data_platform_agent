@@ -5,6 +5,11 @@ package com.dataplatform.enums;
  */
 public enum ScheduleFrequency {
     /**
+     * 小时
+     */
+    HOURLY,
+
+    /**
      * 日
      */
     DAILY,
