@@ -245,7 +245,12 @@ public class JobServiceImpl implements JobService {
         }
 
         wrapper.orderByDesc(Job::getCreateTime);
-        return jobMapper.selectPage(page, wrapper);
+        Page<Job> result = jobMapper.selectPage(page, wrapper);
+
+        // 填充 currentVersionId
+        fillCurrentVersionIds(result.getRecords());
+
+        return result;
     }
 
     @Override
@@ -307,5 +312,27 @@ public class JobServiceImpl implements JobService {
         // 更新作业状态
         job.setStatus(JobStatus.ARCHIVED);
         jobMapper.updateById(job);
+    }
+
+    /**
+     * 批量填充作业的 currentVersionId
+     */
+    private void fillCurrentVersionIds(List<Job> jobs) {
+        if (jobs == null || jobs.isEmpty()) {
+            return;
+        }
+
+        for (Job job : jobs) {
+            if (job.getCurrentVersion() != null) {
+                LambdaQueryWrapper<JobVersion> wrapper = new LambdaQueryWrapper<>();
+                wrapper.eq(JobVersion::getJobId, job.getId())
+                       .eq(JobVersion::getVersion, job.getCurrentVersion())
+                       .select(JobVersion::getId);
+                JobVersion version = jobVersionMapper.selectOne(wrapper);
+                if (version != null) {
+                    job.setCurrentVersionId(version.getId());
+                }
+            }
+        }
     }
 }

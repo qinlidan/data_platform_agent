@@ -63,6 +63,13 @@ public class Job {
     private Integer currentVersion;
 
     /**
+     * 当前版本ID（etl_job_version表的主键，用于前端查询版本详情）
+     * 非数据库字段，由Service层填充
+     */
+    @TableField(exist = false)
+    private Long currentVersionId;
+
+    /**
      * 线上运行版本号（只在新创建、发布、回滚时更新）
      */
     private Integer onlineVersion;

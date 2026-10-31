@@ -185,12 +185,13 @@ public Flux<ServerSentEvent<Map<String, Object>>> chatStream(
 
         // 指代消解：改写用户消息
         String originalMessage = message;
-        String resolvedMessage = coreferenceResolutionService.resolveAndRewrite(
-                originalMessage,
-                String.valueOf(finalConversationId)  // 使用纯数字 conversationId，与主对话一致
-        );
-        log.info("指代消解: conversationId={}, 原始='{}', 改写='{}'",
-                finalConversationId, originalMessage, resolvedMessage);
+        String resolvedMessage =message;
+//        String resolvedMessage = coreferenceResolutionService.resolveAndRewrite(
+//                originalMessage,
+//                String.valueOf(finalConversationId)  // 使用纯数字 conversationId，与主对话一致
+//        );
+//        log.info("指代消解: conversationId={}, 原始='{}', 改写='{}'",
+//                finalConversationId, originalMessage, resolvedMessage);
 
         // 异步落表：用户消息（保存原始消息）
         eventPublisher.publishEvent(new MessageSaveEvent(this, finalConversationId, "user", originalMessage));
