@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,7 +30,8 @@ public interface KnowledgeVectorRepository extends JpaRepository<KnowledgeVector
      * @param docType 文档类型
      * @param routeAction 路由动作
      */
-    @Modifying
+    @Modifying(clearAutomatically = true)
+    @Transactional
     @Query(value = """
         INSERT INTO knowledge_vectors (chunk_id, embedding, doc_type, route_action, created_at, updated_at)
         VALUES (:chunkId, CAST(:embedding AS vector), :docType, :routeAction, :createdAt, :updatedAt)
