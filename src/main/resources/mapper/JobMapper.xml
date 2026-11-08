@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dataplatform.mapper.JobMapper">
+
+    <!-- 分页查询作业列表 -->
+    <select id="selectJobPage" resultType="com.dataplatform.entity.Job">
+        SELECT
+            id,
+            job_name,
+            job_cn_name,
+            job_type,
+            source_datasource_id,
+            source_database,
+            source_table,
+            target_database,
+            target_table,
+            engine_type,
+            schedule_frequency,
+            is_monitored,
+            job_version_id,
+            online_version,
+            status,
+            description,
+            last_publish_time,
+            create_time,
+            update_time,
+            create_by,
+            creator_id,
+            update_by,
+            last_publish_by,
+            last_publish_by_id
+        FROM etl_job
+        <where>
+            <!-- 作业名称右模糊查询 -->
+            <if test="req.jobName != null and req.jobName != ''">
+                AND job_name LIKE CONCAT(#{req.jobName}, '%')
+            </if>
+
+            <!-- 作业中文名右模糊查询 -->
+            <if test="req.jobCnName != null and req.jobCnName != ''">
+                AND job_cn_name LIKE CONCAT(#{req.jobCnName}, '%')
+            </if>
+
+            <!-- 作业类型精确查询 -->
+            <if test="req.jobType != null">
+                AND job_type = #{req.jobType}
+            </if>
+
+            <!-- 作业状态精确查询 -->
+            <if test="req.status != null">
+                AND status = #{req.status}
+            </if>
+
+            <!-- 源数据源ID精确查询 -->
+            <if test="req.sourceDatasourceId != null">
+                AND source_datasource_id = #{req.sourceDatasourceId}
+            </if>
+
+            <!-- 源库名精确查询 -->
+            <if test="req.sourceDatabase != null and req.sourceDatabase != ''">
+                AND source_database = #{req.sourceDatabase}
+            </if>
+
+            <!-- 源表名右模糊查询 -->
+            <if test="req.sourceTable != null and req.sourceTable != ''">
+                AND source_table LIKE CONCAT(#{req.sourceTable}, '%')
+            </if>
+
+            <!-- 调度频率精确查询 -->
+            <if test="req.scheduleFrequency != null">
+                AND schedule_frequency = #{req.scheduleFrequency}
+            </if>
+        </where>
+        <!-- 按最后更新时间倒序排列 -->
+        ORDER BY update_time DESC
+    </select>
+
+</mapper>

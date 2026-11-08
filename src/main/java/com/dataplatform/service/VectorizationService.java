@@ -142,10 +142,12 @@ public class VectorizationService {
                     // 2.4 转换为PostgreSQL向量字符串格式
                     String embeddingStr = formatEmbedding(embedding);
 
-                    // 2.5 upsert到pgvector
+                    // 2.5 upsert到pgvector：embedding + 检索/精排/引用所需的冗余文本一起写
                     LocalDateTime now = LocalDateTime.now();
                     vectorRepository.upsert(chunk.getId(), embeddingStr,
-                            chunk.getDocType(), chunk.getRouteAction(), now, now);
+                            chunk.getDocType(), chunk.getRouteAction(),
+                            buildSearchText(chunk), buildRerankText(chunk), chunk.getSectionPath(),
+                            now, now);
 
                     successIds.add(chunk.getId());
                     log.debug("向量化成功: chunk_id={}", chunk.getId());
@@ -195,29 +197,52 @@ public class VectorizationService {
     }
 
     /**
-     * 按spec 3.2拼接embeddingText
+     * 拼接用于生成向量的 embeddingText（不含 category，不含 symptom_text）
      *
-     * 规则：
-     * - 如果有symptom_text：category | scene_title | 现象: symptom_text | 问法: questions | 说明: answer
-     * - 如果无symptom_text：category | scene_title | 问法: questions | 说明: answer
+     * 格式：scene_title | 问法: questions | 说明: answer
+     * 为空的片段整段跳过，避免出现孤立的 "问法: " 或首尾多余的 " | "。
      *
      * @param chunk 知识块实体
      * @return 拼接后的文本
      */
-    private String buildEmbeddingText(KnowledgeChunk chunk) {
-        String category = chunk.getCategory() != null ? chunk.getCategory() : "";
-        String sceneTitle = chunk.getSceneTitle() != null ? chunk.getSceneTitle() : "";
-        String questions = chunk.getQuestions() != null ? chunk.getQuestions() : "";
-        String answer = chunk.getAnswer() != null ? chunk.getAnswer() : "";
-        String symptomText = chunk.getSymptomText();
-
-        if (symptomText != null && !symptomText.trim().isEmpty()) {
-            return category + " | " + sceneTitle + " | 现象: " + symptomText
-                    + " | 问法: " + questions + " | 说明: " + answer;
-        } else {
-            return category + " | " + sceneTitle + " | 问法: " + questions
-                    + " | 说明: " + answer;
+    String buildEmbeddingText(KnowledgeChunk chunk) {
+        List<String> parts = new ArrayList<>();
+        if (notBlank(chunk.getSceneTitle())) {
+            parts.add(chunk.getSceneTitle().trim());
         }
+        if (notBlank(chunk.getQuestions())) {
+            parts.add("问法: " + chunk.getQuestions().trim());
+        }
+        if (notBlank(chunk.getAnswer())) {
+            parts.add("说明: " + chunk.getAnswer().trim());
+        }
+        return String.join(" | ", parts);
+    }
+
+    private static boolean notBlank(String s) {
+        return s != null && !s.isBlank();
+    }
+
+    /**
+     * pgvector.text：全文检索字段 = doc_type + scene_title + questions + answer
+     */
+    public String buildSearchText(KnowledgeChunk chunk) {
+        return joinNonBlank(chunk.getDocType(), chunk.getSceneTitle(), chunk.getQuestions(), chunk.getAnswer());
+    }
+
+    /**
+     * pgvector.rerank_text：精排字段 = scene_title + questions + answer（不含 doc_type）
+     */
+    public String buildRerankText(KnowledgeChunk chunk) {
+        return joinNonBlank(chunk.getSceneTitle(), chunk.getQuestions(), chunk.getAnswer());
+    }
+
+    /** 用单个空格连接非空片段，null/空白片段跳过，避免出现 "null" 或多余空格 */
+    private static String joinNonBlank(String... parts) {
+        return Arrays.stream(parts)
+                .filter(p -> p != null && !p.isBlank())
+                .map(String::trim)
+                .collect(Collectors.joining(" "));
     }
 
     /**

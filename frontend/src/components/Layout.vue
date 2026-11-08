@@ -32,6 +32,14 @@
             <span>AI 助手</span>
             <el-tag type="success" size="small" style="margin-left: 6px;">Beta</el-tag>
           </el-menu-item>
+          <el-menu-item index="/knowledge">
+            <el-icon><Reading /></el-icon>
+            <span>知识库管理</span>
+          </el-menu-item>
+          <el-menu-item index="/evaluation">
+            <el-icon><DataAnalysis /></el-icon>
+            <span>检索评估</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
 
@@ -45,7 +53,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Platform, List, Connection, ChatDotRound } from '@element-plus/icons-vue'
+import { Platform, List, Connection, ChatDotRound, Reading, DataAnalysis } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()

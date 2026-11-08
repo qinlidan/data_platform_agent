@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  PostgreSQL 专用 SQL（pgvector + pg_jieba）。绑定 postgresSqlSessionFactory。
+  - 关键词路用 text_tsv 生成列（GIN 索引 idx_kv_tsv）+ jiebacfg 中文分词，不要对 text 现算 to_tsvector，否则走不了索引。
+  - 查询串一律用 plainto_tsquery：to_tsquery 遇到 & | ! ' 等字符会直接抛语法错误，用户输入不可控。
+  - &lt;=&gt; 是 pgvector 的余弦距离运算符，XML 里必须转义。
+  - RRF 常数 k=60，两路候选各取 50。
+-->
+<mapper namespace="com.dataplatform.knowledge.pgmapper.HybridSearchMapper">
+
+    <resultMap id="HybridSearchResultMap" type="com.dataplatform.knowledge.dto.HybridSearchResult">
+        <id column="chunk_id" property="chunkId"/>
+        <result column="doc_type" property="docType"/>
+        <result column="route_action" property="routeAction"/>
+        <result column="text" property="text"/>
+        <result column="rerank_text" property="rerankText"/>
+        <result column="section_path" property="sectionPath"/>
+        <result column="score" property="score"/>
+        <result column="vector_rank" property="vectorRank"/>
+        <result column="keyword_rank" property="keywordRank"/>
+        <result column="rrf_score" property="rrfScore"/>
+        <result column="vector_similarity" property="vectorSimilarity"/>
+    </resultMap>
+
+    <!-- 纯向量检索 -->
+    <select id="vectorSearch" resultMap="HybridSearchResultMap">
+        SELECT chunk_id, doc_type, route_action, text, rerank_text, section_path,
+               1 - (embedding &lt;=&gt; CAST(#{queryVector} AS vector)) AS score,
+               1 - (embedding &lt;=&gt; CAST(#{queryVector} AS vector)) AS vector_similarity
+        FROM knowledge_vectors
+        <where>
+            <if test="docType != null and docType != ''">
+                doc_type = #{docType}
+            </if>
+        </where>
+        ORDER BY embedding &lt;=&gt; CAST(#{queryVector} AS vector)
+        LIMIT #{topK}
+    </select>
+
+    <!-- 纯关键词检索 -->
+    <select id="keywordSearch" resultMap="HybridSearchResultMap">
+        SELECT chunk_id, doc_type, route_action, text, rerank_text, section_path,
+               ts_rank_cd(text_tsv, plainto_tsquery('jiebacfg', #{queryText})) AS score
+        FROM knowledge_vectors
+        WHERE text_tsv @@ plainto_tsquery('jiebacfg', #{queryText})
+        <if test="docType != null and docType != ''">
+            AND doc_type = #{docType}
+        </if>
+        ORDER BY score DESC
+        LIMIT #{topK}
+    </select>
+
+    <!-- 混合检索：两路各取 50，RRF 融合，返回向量相似度供拒答阈值使用 -->
+    <select id="hybridSearch" resultMap="HybridSearchResultMap">
+        WITH vector_search AS (
+            SELECT chunk_id,
+                   row_number() OVER (ORDER BY embedding &lt;=&gt; CAST(#{queryVector} AS vector)) AS v_rank
+            FROM knowledge_vectors
+            <where>
+                <if test="docType != null and docType != ''">
+                    doc_type = #{docType}
+                </if>
+            </where>
+            ORDER BY embedding &lt;=&gt; CAST(#{queryVector} AS vector)
+            LIMIT 50
+        ),
+        keyword_search AS (
+            SELECT chunk_id,
+                   row_number() OVER (ORDER BY ts_rank_cd(text_tsv, plainto_tsquery('jiebacfg', #{queryText})) DESC) AS k_rank
+            FROM knowledge_vectors
+            WHERE text_tsv @@ plainto_tsquery('jiebacfg', #{queryText})
+            <if test="docType != null and docType != ''">
+                AND doc_type = #{docType}
+            </if>
+            ORDER BY ts_rank_cd(text_tsv, plainto_tsquery('jiebacfg', #{queryText})) DESC
+            LIMIT 50
+        ),
+        fused AS (
+            SELECT coalesce(v.chunk_id, k.chunk_id) AS chunk_id,
+                   v.v_rank AS vector_rank,
+                   k.k_rank AS keyword_rank,
+                   coalesce(1.0 / (60 + v.v_rank), 0.0) + coalesce(1.0 / (60 + k.k_rank), 0.0) AS rrf_score
+            FROM vector_search v
+            FULL OUTER JOIN keyword_search k ON v.chunk_id = k.chunk_id
+        )
+        SELECT kv.chunk_id, kv.doc_type, kv.route_action, kv.text, kv.rerank_text, kv.section_path,
+               f.rrf_score AS score,
+               f.vector_rank,
+               f.keyword_rank,
+               f.rrf_score,
+               1 - (kv.embedding &lt;=&gt; CAST(#{queryVector} AS vector)) AS vector_similarity
+        FROM fused f
+        JOIN knowledge_vectors kv ON kv.chunk_id = f.chunk_id
+        ORDER BY f.rrf_score DESC
+        LIMIT #{topK}
+    </select>
+
+
+    <!-- ===================== BM25 路 =====================
+         分词方案：不在应用层分词，也不对候选现算 to_tsvector。
+           - 文档侧：直接 unnest(text_tsv)。text_tsv 是入库时由 jiebacfg 生成并持久化的生成列，
+             词项与 GIN 索引完全一致，tf = array_length(positions,1)，文档长度 = 各词项 tf 之和。
+           - 查询侧：unnest(to_tsvector('jiebacfg', 查询))，与文档侧同一分词器。
+           - jieba 会把空白当作词项（lexeme=' '），统计时一律用 btrim(lexeme) <> '' 排除。
+         已知限制：tsvector 每个词项最多保存 256 个位置，tf 超过 256 会被截断（对 chunk 级短文本可忽略）。
+    -->
+
+    <resultMap id="Bm25CandidateMap" type="com.dataplatform.knowledge.dto.Bm25Rows$Candidate">
+        <id column="chunk_id" property="chunkId"/>
+        <result column="doc_type" property="docType"/>
+        <result column="route_action" property="routeAction"/>
+        <result column="text" property="text"/>
+        <result column="rerank_text" property="rerankText"/>
+        <result column="section_path" property="sectionPath"/>
+        <result column="doc_length" property="docLength"/>
+    </resultMap>
+
+    <resultMap id="Bm25TermFreqMap" type="com.dataplatform.knowledge.dto.Bm25Rows$TermFreq">
+        <result column="chunk_id" property="chunkId"/>
+        <result column="lexeme" property="lexeme"/>
+        <result column="tf" property="tf"/>
+    </resultMap>
+
+    <resultMap id="Bm25TermDocFreqMap" type="com.dataplatform.knowledge.dto.Bm25Rows$TermDocFreq">
+        <result column="lexeme" property="lexeme"/>
+        <result column="doc_freq" property="docFreq"/>
+    </resultMap>
+
+    <resultMap id="Bm25CorpusStatsMap" type="com.dataplatform.knowledge.dto.Bm25Rows$CorpusStats">
+        <result column="total_docs" property="totalDocs"/>
+        <result column="avg_doc_length" property="avgDocLength"/>
+    </resultMap>
+
+    <!-- 词项 OR 查询：每个词项各自 plainto_tsquery 再用 || 连接，词项全部走参数绑定，任何字符都安全 -->
+    <sql id="termsOrQuery">
+        <foreach collection="terms" item="t" separator=" || ">plainto_tsquery('jiebacfg', #{t})</foreach>
+    </sql>
+
+    <select id="queryTerms" resultType="java.lang.String">
+        SELECT lexeme
+        FROM unnest(to_tsvector('jiebacfg', #{text}))
+        WHERE btrim(lexeme) &lt;&gt; ''
+        ORDER BY lexeme
+    </select>
+
+    <select id="corpusStats" resultMap="Bm25CorpusStatsMap">
+        SELECT count(*) AS total_docs,
+               coalesce(avg(t.len), 0)::float8 AS avg_doc_length
+        FROM (
+            SELECT (SELECT coalesce(sum(array_length(u.positions, 1)), 0)
+                    FROM unnest(kv.text_tsv) u
+                    WHERE btrim(u.lexeme) &lt;&gt; '') AS len
+            FROM knowledge_vectors kv
+        ) t
+    </select>
+
+    <!-- 先用 GIN 索引筛出含任一词项的行，再对这些行 unnest，避免全表展开 -->
+    <select id="docFrequencies" resultMap="Bm25TermDocFreqMap">
+        SELECT u.lexeme AS lexeme, count(*) AS doc_freq
+        FROM knowledge_vectors kv, unnest(kv.text_tsv) u
+        WHERE kv.text_tsv @@ (<include refid="termsOrQuery"/>)
+          AND u.lexeme IN
+          <foreach collection="terms" item="t" open="(" separator="," close=")">#{t}</foreach>
+        GROUP BY u.lexeme
+    </select>
+
+    <select id="bm25Candidates" resultMap="Bm25CandidateMap">
+        WITH q AS (
+            SELECT <include refid="termsOrQuery"/> AS query
+        )
+        SELECT kv.chunk_id, kv.doc_type, kv.route_action, kv.text, kv.rerank_text, kv.section_path,
+               (SELECT coalesce(sum(array_length(u.positions, 1)), 0)
+                FROM unnest(kv.text_tsv) u
+                WHERE btrim(u.lexeme) &lt;&gt; '') AS doc_length
+        FROM knowledge_vectors kv, q
+        WHERE kv.text_tsv @@ q.query
+        <if test="docType != null and docType != ''">
+            AND kv.doc_type = #{docType}
+        </if>
+        ORDER BY ts_rank_cd(kv.text_tsv, q.query) DESC, kv.chunk_id
+        LIMIT #{limit}
+    </select>
+
+    <select id="termFrequencies" resultMap="Bm25TermFreqMap">
+        SELECT kv.chunk_id AS chunk_id, u.lexeme AS lexeme, array_length(u.positions, 1) AS tf
+        FROM knowledge_vectors kv, unnest(kv.text_tsv) u
+        WHERE kv.chunk_id IN
+        <foreach collection="chunkIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        AND u.lexeme IN
+        <foreach collection="terms" item="t" open="(" separator="," close=")">#{t}</foreach>
+    </select>
+
+    <select id="listAllChunkSections" resultType="com.dataplatform.knowledge.dto.ChunkCandidate">
+        SELECT chunk_id AS chunkId, doc_type AS docType, section_path AS sectionPath
+        FROM knowledge_vectors
+        WHERE section_path IS NOT NULL
+        ORDER BY chunk_id
+    </select>
+
+    <select id="searchCandidates" resultType="com.dataplatform.knowledge.dto.ChunkCandidate">
+        SELECT chunk_id AS chunkId, doc_type AS docType, section_path AS sectionPath, left(text, 120) AS text
+        FROM knowledge_vectors
+        WHERE text_tsv @@ plainto_tsquery('jiebacfg', #{keyword})
+        ORDER BY ts_rank_cd(text_tsv, plainto_tsquery('jiebacfg', #{keyword})) DESC, chunk_id
+        LIMIT #{limit}
+    </select>
+
+</mapper>

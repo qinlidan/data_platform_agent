@@ -1,0 +1,190 @@
+[
+  {
+    "query": "明天北京天气怎么样",
+    "category": "colloquial",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "推荐几家好吃的火锅店",
+    "category": "colloquial",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "帮我写一首关于春天的诗",
+    "category": "colloquial",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "苹果最新的手机什么时候发布",
+    "category": "colloquial",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "红烧肉怎么做才好吃",
+    "category": "colloquial",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "2024 年欧洲杯冠军是谁",
+    "category": "colloquial",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "怎么用 Excel 做数据透视表",
+    "category": "colloquial",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "你是谁，是哪家公司做的",
+    "category": "colloquial",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "Flink 任务出现反压怎么处理",
+    "category": "error_keyword",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "Flink checkpoint 失败怎么排查",
+    "category": "error_keyword",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "Kafka 消费积压了怎么办",
+    "category": "error_keyword",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "Spark Streaming 的 batch interval 怎么设置",
+    "category": "error_keyword",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "PySpark 里 UDF 很慢怎么优化",
+    "category": "error_keyword",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "平台怎么收费，按什么计费",
+    "category": "platform",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "我忘记密码了怎么重置",
+    "category": "platform",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "平台支持单点登录（SSO）或者 LDAP 吗",
+    "category": "platform",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "怎么把查询结果导出成 Excel 下载",
+    "category": "platform",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "敏感字段怎么做脱敏",
+    "category": "platform",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "怎么恢复误删的任务",
+    "category": "platform",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "spark.executor.cores 应该设成多少合适",
+    "category": "error_keyword",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "Spark 3.2 和 3.5 有什么区别",
+    "category": "error_keyword",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "平台有开放 API 可以让我用代码提交任务吗",
+    "category": "platform",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "spark.sql.shuffle.partitions 默认值是多少",
+    "category": "error_keyword",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "动态分区超限时 hive.exec.max.dynamic.partitions 具体应该调到多少",
+    "category": "error_keyword",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "spark.executor.memory 设多大合适，给个具体数",
+    "category": "error_keyword",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "任务实例有暂停状态吗",
+    "category": "platform",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "MaxCompute 的 odps.sql.mapper.memory 能设置的最大值是多少",
+    "category": "error_keyword",
+    "docType": "",
+    "groundTruth": []
+  }
+]

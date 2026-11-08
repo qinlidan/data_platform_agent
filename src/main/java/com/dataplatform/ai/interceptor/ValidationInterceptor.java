@@ -46,57 +46,59 @@ public class ValidationInterceptor implements ToolInterceptor {
 
     @Override
     public String intercept(ToolExecutionContext context, InterceptorChain chain) throws Exception {
-        Map<String, Object> toolDefinition = context.getToolDefinition();
-
-        // 如果没有工具定义，跳过校验
-        if (toolDefinition == null || toolDefinition.isEmpty()) {
-            log.debug("Tool {} has no definition, skipping validation", context.getToolName());
-            return chain.proceed(context);
-        }
-
-        // 提取 inputSchema
-        Object inputSchemaObj = toolDefinition.get("inputSchema");
-        if (inputSchemaObj == null) {
-            log.debug("Tool {} has no inputSchema, skipping validation", context.getToolName());
-            return chain.proceed(context);
-        }
-
-        try {
-            // 转换 schema 为 JsonNode
-            JsonNode schemaNode = objectMapper.valueToTree(inputSchemaObj);
-            JsonSchema schema = schemaFactory.getSchema(schemaNode);
-
-            // 转换输入参数为 JsonNode
-            JsonNode inputNode = objectMapper.readTree(context.getToolInput());
-
-            // 执行校验
-            Set<ValidationMessage> errors = schema.validate(inputNode);
-
-            if (!errors.isEmpty()) {
-                log.warn("Tool {} validation failed: {}", context.getToolName(), errors);
-
-                List<ToolParameterValidationException.ValidationError> validationErrors = errors.stream()
-                        .map(err -> new ToolParameterValidationException.ValidationError(
-                                err.getInstanceLocation().toString(),
-                                err.getMessage()
-                        ))
-                        .collect(Collectors.toList());
-
-                throw new ToolParameterValidationException(
-                        context.getToolName(),
-                        validationErrors
-                );
-            }
-
-            log.debug("Tool {} validation passed", context.getToolName());
-            return chain.proceed(context);
-
-        } catch (ToolParameterValidationException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Failed to validate tool {} input", context.getToolName(), e);
-            // 校验器本身出错时，放行调用（避免阻塞业务）
-            return chain.proceed(context);
-        }
+         log.debug("Tool {} has no inputSchema, skipping validation", context.getToolName());
+          return chain.proceed(context);
+//        Map<String, Object> toolDefinition = context.getToolDefinition();
+//
+//        // 如果没有工具定义，跳过校验
+//        if (toolDefinition == null || toolDefinition.isEmpty()) {
+//            log.debug("Tool {} has no definition, skipping validation", context.getToolName());
+//            return chain.proceed(context);
+//        }
+//
+//        // 提取 inputSchema
+//        Object inputSchemaObj = toolDefinition.get("inputSchema");
+//        if (inputSchemaObj == null) {
+//            log.debug("Tool {} has no inputSchema, skipping validation", context.getToolName());
+//            return chain.proceed(context);
+//        }
+//
+//        try {
+//            // 转换 schema 为 JsonNode
+//            JsonNode schemaNode = objectMapper.valueToTree(inputSchemaObj);
+//            JsonSchema schema = schemaFactory.getSchema(schemaNode);
+//
+//            // 转换输入参数为 JsonNode
+//            JsonNode inputNode = objectMapper.readTree(context.getToolInput());
+//
+//            // 执行校验
+//            Set<ValidationMessage> errors = schema.validate(inputNode);
+//
+//            if (!errors.isEmpty()) {
+//                log.warn("Tool {} validation failed: {}", context.getToolName(), errors);
+//
+//                List<ToolParameterValidationException.ValidationError> validationErrors = errors.stream()
+//                        .map(err -> new ToolParameterValidationException.ValidationError(
+//                                err.getInstanceLocation().toString(),
+//                                err.getMessage()
+//                        ))
+//                        .collect(Collectors.toList());
+//
+//                throw new ToolParameterValidationException(
+//                        context.getToolName(),
+//                        validationErrors
+//                );
+//            }
+//
+//            log.debug("Tool {} validation passed", context.getToolName());
+//            return chain.proceed(context);
+//
+//        } catch (ToolParameterValidationException e) {
+//            throw e;
+//        } catch (Exception e) {
+//            log.error("Failed to validate tool {} input", context.getToolName(), e);
+//            // 校验器本身出错时，放行调用（避免阻塞业务）
+//            return chain.proceed(context);
+//        }
     }
 }

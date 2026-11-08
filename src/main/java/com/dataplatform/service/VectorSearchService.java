@@ -52,6 +52,88 @@ public class VectorSearchService {
      * @return 包含chunk文本和元数据的结果列表，按相似度降序排列
      */
     public List<SearchResultDTO> search(String query, int topK) {
+        return searchWithDTO(query, topK);
+    }
+
+    /**
+     * 向量语义检索（支持docType过滤，返回Map格式）
+     *
+     * @param query 用户查询文本
+     * @param docType 文档类型过滤（可选）
+     * @param topK 返回top-K结果
+     * @return 包含chunk文本和元数据的结果列表，按相似度降序排列
+     */
+    public List<Map<String, Object>> searchWithMap(String query, String docType, int topK) {
+        log.info("开始向量检索: query={}, docType={}, topK={}", query, docType, topK);
+
+        // Step 1: 查询向量化（添加 query: 前缀）
+        float[] queryEmbedding = embeddingService.embedQuery(query);
+        log.debug("查询向量化完成: dimension={}", queryEmbedding.length);
+
+        // Step 2: 转换向量为pgvector格式字符串
+        String embeddingStr = arrayToString(queryEmbedding);
+
+        // Step 3: pgvector检索
+        List<VectorSearchResult> vectorResults = vectorRepository.searchSimilar(
+            embeddingStr,
+            docType,
+            topK
+        );
+
+        if (vectorResults.isEmpty()) {
+            log.info("向量检索无结果");
+            return Collections.emptyList();
+        }
+
+        log.info("向量检索返回 {} 条结果", vectorResults.size());
+
+        // Step 4: 提取chunk_id列表（保持顺序）
+        List<Long> chunkIds = vectorResults.stream()
+            .map(VectorSearchResult::getChunkId)
+            .collect(Collectors.toList());
+
+        // Step 5: 批量查询MySQL元数据
+        List<KnowledgeChunk> chunks = chunkMapper.selectBatchIds(chunkIds);
+
+        // Step 6: 建立chunk_id -> KnowledgeChunk 的映射
+        Map<Long, KnowledgeChunk> chunkMap = chunks.stream()
+            .collect(Collectors.toMap(KnowledgeChunk::getId, chunk -> chunk));
+
+        // Step 7: 组装结果，保持pgvector返回的顺序
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (VectorSearchResult vectorResult : vectorResults) {
+            Long chunkId = vectorResult.getChunkId();
+            KnowledgeChunk chunk = chunkMap.get(chunkId);
+
+            if (chunk == null) {
+                log.warn("找不到chunk元数据: chunk_id={}", chunkId);
+                continue;
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("id", chunkId);
+            result.put("questions", chunk.getQuestions());
+            result.put("answer", chunk.getAnswer());
+            result.put("score", vectorResult.getScore().doubleValue());
+            result.put("docType", chunk.getDocType());
+            result.put("docId", chunk.getDocId());
+            result.put("sectionPath", chunk.getSectionPath());
+
+            results.add(result);
+        }
+
+        log.info("检索完成: 返回 {} 条结果", results.size());
+        return results;
+    }
+
+    /**
+     * 向量语义检索（返回SearchResultDTO）
+     *
+     * @param query 用户查询文本
+     * @param topK 返回top-K结果
+     * @return SearchResultDTO列表
+     */
+    public List<SearchResultDTO> searchWithDTO(String query, int topK) {
         log.info("开始向量检索: query={}, topK={}", query, topK);
 
         // Step 1: 查询向量化（添加 query: 前缀）

@@ -5,6 +5,7 @@ import com.dataplatform.ai.context.ToolExecutionContext;
 import com.dataplatform.ai.exception.ToolExecutionTimeoutException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.net.ConnectException;
@@ -52,6 +53,7 @@ import java.util.concurrent.*;
  */
 @Slf4j
 @Component
+@Order(500)  // 外层，在权限、确认等拦截器之后
 @RequiredArgsConstructor
 public class TimeoutRetryInterceptor implements ToolInterceptor {
 

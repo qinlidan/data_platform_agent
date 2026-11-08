@@ -49,25 +49,39 @@ public class KnowledgeImportService {
             return;
         }
 
+        log.info("开始扫描 data/query 目录");
+        int successCount = 0;
+        int failureCount = 0;
+
         try (Stream<Path> paths = Files.walk(dataQueryPath, 1)) {
-            paths
+            List<Path> files = paths
                 .filter(Files::isRegularFile)
                 .filter(p -> p.toString().endsWith(".md") || p.toString().endsWith(".markdown"))
-                .forEach(filePath -> {
-                    String fileName = filePath.getFileName().toString();
-                    String docId = fileName.replaceAll("\\.m(ark)?d(own)?$", "");
-                    String docType = docId; // 文件名即docType
+                .toList();
 
-                    try {
-                        importDocument(filePath.toFile(), docId, docType);
-                        log.info("自动导入成功: {}", fileName);
-                    } catch (Exception e) {
-                        log.error("自动导入失败: {} - {}", fileName, e.getMessage(), e);
-                    }
-                });
+            log.info("找到 {} 个文档文件", files.size());
+
+            for (Path filePath : files) {
+                String fileName = filePath.getFileName().toString();
+                String docId = fileName.replaceAll("\\.(md|markdown)$", "");
+                String docType = docId; // 文件名即docType
+
+                try {
+                    log.info("开始处理文档: {}", fileName);
+                    importDocument(filePath.toFile(), docId, docType);
+                    successCount++;
+                    log.info("✓ 自动导入成功: {} (进度: {}/{})", fileName, successCount, files.size());
+                } catch (Exception e) {
+                    failureCount++;
+                    log.error("✗ 自动导入失败: {} - {} (进度: {}/{})",
+                        fileName, e.getMessage(), successCount + failureCount, files.size(), e);
+                }
+            }
         } catch (IOException e) {
             log.error("扫描 data/query 目录失败", e);
         }
+
+        log.info("自动导入完成: 成功 {}, 失败 {}", successCount, failureCount);
     }
 
     /**
@@ -110,8 +124,13 @@ public class KnowledgeImportService {
                 chunk.setCategory(dto.getCategory());
                 chunk.setSceneType(dto.getSceneType());
                 chunk.setSceneTitle(dto.getSceneTitle());
+                chunk.setSymptomText(dto.getSymptomText());
                 chunk.setQuestions(dto.getQuestions());
                 chunk.setAnswer(dto.getAnswer());
+                chunk.setSectionPath(dto.getSectionPath());
+                chunk.setContentType(dto.getContentType());
+                chunk.setIsTunable(dto.getIsTunable());
+                chunk.setRouteAction(dto.getRouteAction());
                 chunk.setVectorizeStatus("pending_vectorization");
                 chunk.setCreatedAt(now);
                 chunk.setUpdatedAt(now);
@@ -120,9 +139,13 @@ public class KnowledgeImportService {
             })
             .toList();
 
-        // 6. 触发向量化（异步）
-        vectorizationService.vectorizeChunksAsync(newChunkIds);
-
-        log.info("文档导入完成: docId={}, {} chunks submitted for vectorization", docId, newChunkIds.size());
+        // 6. 触发向量化（异步，异常不影响导入事务）
+        try {
+            vectorizationService.vectorizeChunksAsync(newChunkIds);
+            log.info("文档导入完成: docId={}, {} chunks submitted for vectorization", docId, newChunkIds.size());
+        } catch (Exception e) {
+            log.warn("向量化任务提交失败（不影响导入）: docId={}, error={}", docId, e.getMessage());
+            log.info("文档导入完成: docId={}, {} chunks saved (vectorization failed)", docId, newChunkIds.size());
+        }
     }
 }

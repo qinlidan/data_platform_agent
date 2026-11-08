@@ -76,7 +76,19 @@ public class ObservableToolCallback implements ToolCallback {
             ToolExecutionContext context = buildContext(toolName, toolInput, toolContext);
 
             // 通过拦截器链执行工具调用（不再使用 ThreadLocal）
-            String result = toolExecutor.execute(context, ctx -> delegate.call(toolInput, toolContext));
+            String raw = toolExecutor.execute(context, ctx -> delegate.call(toolInput, toolContext));
+
+            // 工具可能在返回值末尾夹带引用数据：剥掉它，让模型和 tool_end 都只看到干净文本，
+            // 引用单独作为 citations 事件推给前端
+            CitationPayload.Extracted extracted = CitationPayload.extract(raw);
+            String result = extracted.cleanText();
+            if (!extracted.citations().isEmpty()) {
+                emit("citations", Map.of(
+                        "toolName", toolName,
+                        "toolCallId", toolCallId,
+                        "citations", extracted.citations()
+                ));
+            }
 
             long duration = System.currentTimeMillis() - startTime;
 

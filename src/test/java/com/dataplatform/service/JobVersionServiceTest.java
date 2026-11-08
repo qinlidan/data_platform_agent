@@ -55,7 +55,7 @@ class JobVersionServiceTest {
         // 准备测试数据
         testJob = new Job();
         testJob.setId(1L);
-        testJob.setCurrentVersion(3);
+        testJob.setJobVersionId(10L); // 使用 jobVersionId 代替 currentVersion
         testJob.setOnlineVersion(3);
 
         publishedVersion = new JobVersion();

@@ -1,0 +1,32 @@
+[
+  {
+    "query": "DB2HIVE 作业怎么创建",
+    "difficulty": "easy",
+    "queryType": "keyword",
+    "groundTruth": [1001, 1002]
+  },
+  {
+    "query": "HIVE2HIVE 作业发布后如何回滚到旧版本",
+    "difficulty": "medium",
+    "queryType": "keyword",
+    "groundTruth": [1010]
+  },
+  {
+    "query": "数据同步失败了应该从哪里排查原因",
+    "difficulty": "medium",
+    "queryType": "semantic",
+    "groundTruth": [1020, 1021]
+  },
+  {
+    "query": "怎样让离线任务每天凌晨自动跑起来",
+    "difficulty": "hard",
+    "queryType": "semantic",
+    "groundTruth": [1030]
+  },
+  {
+    "query": "字段元数据解析失败时 SQL 配置要怎么改",
+    "difficulty": "hard",
+    "queryType": "hybrid",
+    "groundTruth": [1040, 1041, 1042]
+  }
+]

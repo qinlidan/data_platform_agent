@@ -41,4 +41,22 @@ public class KnowledgeVectorizationController {
 
         return Map.of("submitted", chunkIds.size(), "message", "已提交补偿任务");
     }
+
+    /**
+     * 存量回填：对所有已向量化的 chunk 重新走一遍向量化，补写 text / rerank_text / section_path。
+     * 与 /retry 的区别：/retry 只处理 pending_vectorization，而存量数据状态已是 vectorized。
+     * 会重新调用 Embedding 接口（有费用/耗时），按需手动触发。
+     */
+    @PostMapping("/backfill")
+    public Map<String, Object> backfillHybridColumns() {
+        List<Long> chunkIds = chunkMapper.selectList(
+            Wrappers.<KnowledgeChunk>lambdaQuery()
+                .eq(KnowledgeChunk::getVectorizeStatus, "vectorized")
+        ).stream().map(KnowledgeChunk::getId).collect(Collectors.toList());
+
+        log.info("手动触发混合检索列回填: {} chunks", chunkIds.size());
+        vectorizationService.vectorizeChunksAsync(chunkIds);
+
+        return Map.of("submitted", chunkIds.size(), "message", "已提交回填任务");
+    }
 }
