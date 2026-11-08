@@ -1,0 +1,102 @@
+[
+  {
+    "input": "Spark 的 executor 内存怎么设置？",
+    "expectedDomain": "QA",
+    "expectedIntentType": "NONE"
+  },
+  {
+    "input": "Hive 表分区过多会有什么性能影响？",
+    "expectedDomain": "QA",
+    "expectedIntentType": "NONE"
+  },
+  {
+    "input": "如何优化 MapReduce 任务的 Shuffle 阶段？",
+    "expectedDomain": "QA",
+    "expectedIntentType": "NONE"
+  },
+  {
+    "input": "Flink checkpoint 超时如何排查？",
+    "expectedDomain": "QA",
+    "expectedIntentType": "NONE"
+  },
+  {
+    "input": "Kafka 消费者组的 rebalance 机制是什么？",
+    "expectedDomain": "QA",
+    "expectedIntentType": "NONE"
+  },
+  {
+    "input": "帮我创建、提交并发布作业 user_sync",
+    "expectedDomain": "DATAPLATFORM_MANAGER",
+    "expectedIntentType": "CREATE_SUBMIT_PUBLISH"
+  },
+  {
+    "input": "请创建作业 etl_job，然后提交它，最后发布上线",
+    "expectedDomain": "DATAPLATFORM_MANAGER",
+    "expectedIntentType": "CREATE_SUBMIT_PUBLISH"
+  },
+  {
+    "input": "新建作业 data_import，提交并发布",
+    "expectedDomain": "DATAPLATFORM_MANAGER",
+    "expectedIntentType": "CREATE_SUBMIT_PUBLISH"
+  },
+  {
+    "input": "查询作业 ID 为 3 的详情",
+    "expectedDomain": "DATAPLATFORM_MANAGER",
+    "expectedIntentType": "OTHER"
+  },
+  {
+    "input": "删除作业 old_job",
+    "expectedDomain": "DATAPLATFORM_MANAGER",
+    "expectedIntentType": "OTHER"
+  },
+  {
+    "input": "列出最近的作业",
+    "expectedDomain": "DATAPLATFORM_MANAGER",
+    "expectedIntentType": "OTHER"
+  },
+  {
+    "input": "搜索包含 spark 的作业",
+    "expectedDomain": "DATAPLATFORM_MANAGER",
+    "expectedIntentType": "OTHER"
+  },
+  {
+    "input": "提交作业 ID 5",
+    "expectedDomain": "DATAPLATFORM_MANAGER",
+    "expectedIntentType": "OTHER"
+  },
+  {
+    "input": "发布作业 prod_etl",
+    "expectedDomain": "DATAPLATFORM_MANAGER",
+    "expectedIntentType": "OTHER"
+  },
+  {
+    "input": "更新作业配置",
+    "expectedDomain": "DATAPLATFORM_MANAGER",
+    "expectedIntentType": "OTHER"
+  },
+  {
+    "input": "你好",
+    "expectedDomain": "CHITCHAT",
+    "expectedIntentType": "NONE"
+  },
+  {
+    "input": "谢谢你的帮助",
+    "expectedDomain": "CHITCHAT",
+    "expectedIntentType": "NONE"
+  },
+  {
+    "input": "今天天气怎么样",
+    "expectedDomain": "OTHER",
+    "expectedIntentType": "NONE"
+  },
+  {
+    "input": "帮我订一张去北京的机票",
+    "expectedDomain": "OTHER",
+    "expectedIntentType": "NONE"
+  },
+  {
+    "input": "推荐一家好吃的餐厅",
+    "expectedDomain": "OTHER",
+    "expectedIntentType": "NONE"
+  }
+]
