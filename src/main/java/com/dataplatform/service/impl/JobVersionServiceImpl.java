@@ -48,16 +48,24 @@ public class JobVersionServiceImpl implements JobVersionService {
         }
 
         // 获取当前版本
-        LambdaQueryWrapper<JobVersion> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(JobVersion::getJobId, jobId)
-               .eq(JobVersion::getVersion, job.getCurrentVersion());
-        JobVersion currentVersion = jobVersionMapper.selectOne(wrapper);
+        JobVersion currentVersion = jobVersionMapper.selectById(job.getJobVersionId());
+        if (currentVersion == null) {
+            throw new BusinessException("作业当前版本不存在");
+        }
 
         // 如果当前版本已发布，创建新版本
         if (VersionStatus.PUBLISHED.equals(currentVersion.getStatus())) {
+            // 查询当前最大版本号
+            LambdaQueryWrapper<JobVersion> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(JobVersion::getJobId, jobId)
+                   .orderByDesc(JobVersion::getVersion)
+                   .last("LIMIT 1");
+            JobVersion latestVersion = jobVersionMapper.selectOne(wrapper);
+            int nextVersion = latestVersion != null ? latestVersion.getVersion() + 1 : 1;
+
             JobVersion newVersion = new JobVersion();
             newVersion.setJobId(jobId);
-            newVersion.setVersion(job.getCurrentVersion() + 1);
+            newVersion.setVersion(nextVersion);
             newVersion.setSqlContent(request.getSqlContent());
             newVersion.setSparkConfig(request.getSparkConfig());
             newVersion.setChangeLog(request.getChangeLog());
@@ -65,8 +73,8 @@ public class JobVersionServiceImpl implements JobVersionService {
 
             jobVersionMapper.insert(newVersion);
 
-            // 更新作业当前版本
-            job.setCurrentVersion(newVersion.getVersion());
+            // 更新作业的 jobVersionId
+            job.setJobVersionId(newVersion.getId());
             jobMapper.updateById(job);
 
             return newVersion;
@@ -116,9 +124,9 @@ public class JobVersionServiceImpl implements JobVersionService {
         }
 
         // 检查字段元数据
-        if (fieldMetadataService.listByVersionId(id).isEmpty()) {
-            throw new BusinessException("版本未配置字段元数据，无法发布");
-        }
+//        if (fieldMetadataService.listByVersionId(id).isEmpty()) {
+//            throw new BusinessException("版本未配置字段元数据，无法发布");
+//        }
 
         // 取消之前的发布版本
         LambdaQueryWrapper<JobVersion> wrapper = new LambdaQueryWrapper<>();
@@ -158,15 +166,15 @@ public class JobVersionServiceImpl implements JobVersionService {
             throw new BusinessException("作业至少需要保留一个版本");
         }
 
-        // 删除版本的字段元数据
-        fieldMetadataService.deleteByVersionId(id);
+//        // 删除版本的字段元数据
+//        fieldMetadataService.deleteByVersionId(id);
 
         // 删除版本
         jobVersionMapper.deleteById(id);
 
-        // 如果删除的是当前版本，需要更新作业的当前版本号
+        // 如果删除的是当前版本，需要更新作业的 jobVersionId
         Job job = jobMapper.selectById(version.getJobId());
-        if (job.getCurrentVersion().equals(version.getVersion())) {
+        if (job.getJobVersionId().equals(id)) {
             // 查找最新的版本
             LambdaQueryWrapper<JobVersion> latestWrapper = new LambdaQueryWrapper<>();
             latestWrapper.eq(JobVersion::getJobId, version.getJobId())
@@ -174,8 +182,10 @@ public class JobVersionServiceImpl implements JobVersionService {
                         .last("LIMIT 1");
             JobVersion latestVersion = jobVersionMapper.selectOne(latestWrapper);
 
-            job.setCurrentVersion(latestVersion.getVersion());
-            jobMapper.updateById(job);
+            if (latestVersion != null) {
+                job.setJobVersionId(latestVersion.getId());
+                jobMapper.updateById(job);
+            }
         }
     }
 

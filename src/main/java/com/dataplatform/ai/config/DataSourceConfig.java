@@ -62,6 +62,12 @@ public class DataSourceConfig {
         return factoryBean.getObject();
     }
 
+    @Primary
+    @Bean(name = "mysqlTransactionManager")
+    public PlatformTransactionManager mysqlTransactionManager(@Qualifier("mysqlDataSource") DataSource dataSource) {
+        return new org.springframework.jdbc.datasource.DataSourceTransactionManager(dataSource);
+    }
+
     // ======================== PostgreSQL 数据源（Spring Data JPA） ========================
 
     @Bean(name = "postgresDataSource")
@@ -76,7 +82,7 @@ public class DataSourceConfig {
             @Qualifier("postgresDataSource") DataSource dataSource) {
 
         Map<String, Object> properties = new HashMap<>();
-        properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
+        properties.put("hibernate.dialect", "com.dataplatform.knowledge.dialect.PostgreSQLVectorDialect");
         properties.put("hibernate.hbm2ddl.auto", "none");  // 禁止自动建表
         properties.put("hibernate.format_sql", true);
 
@@ -105,5 +111,14 @@ public class DataSourceConfig {
     public PlatformTransactionManager pgvectorTransactionManager(
             @Qualifier("postgresTransactionManager") PlatformTransactionManager transactionManager) {
         return transactionManager;
+    }
+
+    /**
+     * PostgreSQL JdbcTemplate for raw SQL queries (e.g., tsvector tests)
+     */
+    @Bean(name = "postgresqlJdbcTemplate")
+    public org.springframework.jdbc.core.JdbcTemplate postgresqlJdbcTemplate(
+            @Qualifier("postgresDataSource") DataSource dataSource) {
+        return new org.springframework.jdbc.core.JdbcTemplate(dataSource);
     }
 }

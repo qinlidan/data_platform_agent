@@ -1,5 +1,6 @@
 package com.dataplatform.config;
 
+import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInterceptor;
@@ -23,8 +24,11 @@ public class MyBatisPlusConfig {
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
 
-        // 分页插件 - 自动识别数据库类型
-        interceptor.addInnerInterceptor(new PaginationInnerInterceptor());
+        // 分页插件 - 指定 MySQL 数据库类型
+        PaginationInnerInterceptor paginationInterceptor = new PaginationInnerInterceptor(DbType.MYSQL);
+        // 单页分页条数限制（默认无限制）
+        paginationInterceptor.setMaxLimit(500L);
+        interceptor.addInnerInterceptor(paginationInterceptor);
 
         // 乐观锁插件
         interceptor.addInnerInterceptor(new OptimisticLockerInnerInterceptor());

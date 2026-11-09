@@ -6,6 +6,7 @@ import com.dataplatform.mapper.FaqMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -55,6 +56,10 @@ public class FaqService extends ServiceImpl<FaqMapper, Faq> {
         faq.setAnswer(answer);
         faq.setDisplayOrder(displayOrder != null ? displayOrder : 0);
         faq.setIsEnabled(true);
+
+        LocalDateTime now = LocalDateTime.now();
+        faq.setCreatedAt(now);
+        faq.setUpdatedAt(now);
 
         save(faq);
         log.debug("[FaqService] Created FAQ: id={}, question={}", faq.getId(), question);

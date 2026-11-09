@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>置信度阈值标定</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            color: #333;
+        }
+
+        .header {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .metric-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-size: 32px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .metric-desc {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .chart-container h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .distribution-table {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        td {
+            font-size: 14px;
+        }
+
+        .recommendations {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .rec-item {
+            padding: 12px;
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            margin-bottom: 12px;
+            border-radius: 4px;
+        }
+
+        .rec-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .rec-value {
+            color: #007bff;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>置信度阈值标定</h1>
+    <p>基于正例和反例评估集计算最优阈值，优化可答通过率和应拒答拒绝率</p>
+    <div class="controls">
+        <button id="calibrateBtn" class="btn btn-primary" onclick="runCalibration()">
+            重新 置信度阈值标定
+        </button>
+    </div>
+</div>
+
+<div id="errorMsg" class="error" style="display: none;"></div>
+
+<div id="loading" class="loading" style="display: none;">
+    标定中，请稍候...
+</div>
+
+<div id="results" style="display: none;">
+    <!-- 核心指标 -->
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-label">推荐阈值</div>
+            <div class="metric-value" id="threshold">0.17</div>
+            <div class="metric-desc">Youden J = <span id="youdenIndex">0.892</span></div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">当前推荐阈值(查询数据库配置)</div>
+            <div class="metric-value" id="currentThreshold">0.30</div>
+            <div class="metric-desc">高于推荐点击查询数据库配置</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">可答通过率</div>
+            <div class="metric-value" id="accuracy">83%</div>
+            <div class="metric-desc">通过样本中可答占比（任何评估集中可答的问题）</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">应拒拒绝率</div>
+            <div class="metric-value" id="refusalRate">0%</div>
+            <div class="metric-desc">应拒样本中实际被拒比例 待实施进展上映图</div>
+        </div>
+    </div>
+
+    <!-- 阈值扫描曲线 -->
+    <div class="chart-container">
+        <h2>阈值扫描曲线 <span style="font-size: 14px; color: #666;">β 线 = 0.95, 步长 = 0.01</span></h2>
+        <canvas id="thresholdCurve" width="800" height="400"></canvas>
+        <div style="margin-top: 16px; padding: 12px; background: #f8f9fa; border-radius: 4px; font-size: 13px; line-height: 1.6;">
+            <strong>读图指引：</strong>
+            横轴为阈值 t，每条线代表随 t 变化的性能指标。选定 t 后，只有置信度 ≥ t 的问题通过闸门生成回答。<br>
+            · <span style="color: #28a745;">可答通过率</span>：通过闸门的样本中，真正可答占比（accuracy）<br>
+            · <span style="color: #dc3545;">应拒拒绝率</span>：应拒样本中实际被拒比例<br>
+            · <span style="color: #007bff;">综合准确</span>：可答通过数 / 总通过数<br>
+            · <span style="color: #6c757d;">召回侧值</span>：可答通过数 / 可答总数（保留多少真正可答的问题）
+        </div>
+    </div>
+
+    <!-- 置信度分布统计 -->
+    <div class="distribution-table">
+        <h2>置信度值域分布</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>类型</th>
+                <th>数量</th>
+                <th>最低</th>
+                <th>p25</th>
+                <th>中位数</th>
+                <th>p75</th>
+                <th>最高</th>
+            </tr>
+            </thead>
+            <tbody id="distributionBody">
+            <!-- 动态填充 -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 多策略推荐 -->
+    <div class="recommendations">
+        <h2>什么会 [可答被拒阈]:</h2>
+        <div id="recommendationsBody">
+            <!-- 动态填充 -->
+        </div>
+        <div style="margin-top: 16px; padding: 12px; background: #e7f3ff; border-left: 4px solid #007bff; border-radius: 4px; font-size: 13px;">
+            序班提示五类率首，但区分是哪里被「Tοp1 稿性 = 0.5 / 百万项斥序中 0.2 / Top1-Top2 分差 = 0.2 / 关谷斑块数量中 0.1」收到代表机拦性判断标致。权限实验性远逝其衰 VIP 阈窃机敬最次。
+        </div>
+    </div>
+</div>
+
+<script>
+    let chart = null;
+
+    async function runCalibration() {
+        const btn = document.getElementById('calibrateBtn');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const errorMsg = document.getElementById('errorMsg');
+
+        btn.disabled = true;
+        loading.style.display = 'block';
+        results.style.display = 'none';
+        errorMsg.style.display = 'none';
+
+        try {
+            const response = await fetch('/confidence/calibrate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+            }
+
+            const data = await response.json();
+            renderResults(data);
+
+            results.style.display = 'block';
+        } catch (error) {
+            errorMsg.textContent = '标定失败: ' + error.message;
+            errorMsg.style.display = 'block';
+        } finally {
+            loading.style.display = 'none';
+            btn.disabled = false;
+        }
+    }
+
+    function renderResults(data) {
+        // 核心指标
+        document.getElementById('threshold').textContent = data.recommendedThreshold.toFixed(2);
+        document.getElementById('youdenIndex').textContent = data.youdenIndex.toFixed(3);
+        document.getElementById('accuracy').textContent = (data.accuracy * 100).toFixed(1) + '%';
+        document.getElementById('refusalRate').textContent = (data.rejectionRate * 100).toFixed(1) + '%';
+
+        // 阈值扫描曲线
+        renderCurve(data.curve, data.recommendedThreshold);
+
+        // 分布统计表
+        renderDistribution(data.distribution);
+
+        // 多策略推荐
+        renderRecommendations(data.recommendations, data.recommendedThreshold);
+    }
+
+    function renderCurve(curve, recommendedThreshold) {
+        const ctx = document.getElementById('thresholdCurve').getContext('2d');
+
+        if (chart) {
+            chart.destroy();
+        }
+
+        const thresholds = curve.map(p => p.threshold);
+        const answerablePass = curve.map(p => p.answerablePassRate);
+        const refusalReject = curve.map(p => p.refusalRejectRate);
+        const combinedAccuracy = curve.map(p => p.combinedAccuracy);
+        const recallSide = curve.map(p => p.recallSide);
+
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: thresholds,
+                datasets: [
+                    {
+                        label: '可答通过率',
+                        data: answerablePass,
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.3
+                    },
+                    {
+                        label: '应拒拒绝率',
+                        data: refusalReject,
+                        borderColor: '#dc3545',
+                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.3
+                    },
+                    {
+                        label: '综合准确',
+                        data: combinedAccuracy,
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.3
+                    },
+                    {
+                        label: '召回侧值',
+                        data: recallSide,
+                        borderColor: '#6c757d',
+                        backgroundColor: 'rgba(108, 117, 125, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    },
+                    annotation: {
+                        annotations: {
+                            line1: {
+                                type: 'line',
+                                xMin: recommendedThreshold,
+                                xMax: recommendedThreshold,
+                                borderColor: '#000',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                label: {
+                                    content: `选定 ${recommendedThreshold.toFixed(2)}`,
+                                    enabled: true,
+                                    position: 'top'
+                                }
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: '阈值 t'
+                        },
+                        ticks: {
+                            maxTicksLimit: 20
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: '比例'
+                        },
+                        min: 0,
+                        max: 1
+                    }
+                }
+            }
+        });
+    }
+
+    function renderDistribution(dist) {
+        const tbody = document.getElementById('distributionBody');
+        tbody.innerHTML = '';
+
+        const categories = [
+            {key: 'answerable', label: '可答(A/B/C桶)', color: '#28a745'},
+            {key: 'colloquial', label: '口语化', color: '#ffc107'},
+            {key: 'errorKeyword', label: '关键词', color: '#ff9800'},
+            {key: 'platform', label: '平台问题', color: '#dc3545'}
+        ];
+
+        categories.forEach(cat => {
+            const data = dist[cat.key];
+            if (!data || data.count === 0) {
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="border-left: 4px solid ${cat.color};">${cat.label}</td>
+                        <td>0</td>
+                        <td colspan="5">-</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML += `
+                <tr>
+                    <td style="border-left: 4px solid ${cat.color};">${cat.label}</td>
+                    <td>${data.count}</td>
+                    <td>${data.min.toFixed(3)}</td>
+                    <td>${data.p25.toFixed(3)}</td>
+                    <td>${data.median.toFixed(3)}</td>
+                    <td>${data.p75.toFixed(3)}</td>
+                    <td>${data.max.toFixed(3)}</td>
+                </tr>
+            `;
+        });
+    }
+
+    function renderRecommendations(recommendations, currentThreshold) {
+        const body = document.getElementById('recommendationsBody');
+        body.innerHTML = '';
+
+        const strategies = [
+            {key: 'youden_max', label: 'Youden指数最大', desc: '平衡可答通过率和召回率'},
+            {key: 'high_recall', label: '最高召回率(准确≥0.8)', desc: '优先保留更多可答问题'},
+            {key: 'high_accuracy', label: '最高准确率(召回≥0.7)', desc: '优先降低误答率'}
+        ];
+
+        strategies.forEach(strat => {
+            const threshold = recommendations[strat.key];
+            if (threshold !== undefined) {
+                const isCurrent = Math.abs(threshold - currentThreshold) < 0.005;
+                body.innerHTML += `
+                    <div class="rec-item" style="${isCurrent ? 'border-left-color: #28a745;' : ''}">
+                        <div class="rec-title">${strat.label} ${isCurrent ? '(当前)' : ''}</div>
+                        <div class="rec-value">${threshold.toFixed(2)}</div>
+                        <div style="font-size: 12px; color: #666; margin-top: 4px;">${strat.desc}</div>
+                    </div>
+                `;
+            }
+        });
+    }
+
+    // 页面加载后自动触发一次标定
+    // window.addEventListener('load', () => {
+    //     runCalibration();
+    // });
+</script>
+</body>
+</html>

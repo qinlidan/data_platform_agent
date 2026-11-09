@@ -183,3 +183,15 @@ workflow:
   responses:
     chitchat: "很高兴和你聊天！有什么数据平台相关的问题可以问我。"
     other: "抱歉，我只能回答数据平台相关的问题。"
+
+# 知识库置信度闸配置
+knowledge:
+  confidence:
+    # 综合置信度阈值，建议通过标定工具计算最优值
+    # 通过 /confidence/calibrate 接口可基于评估集自动标定
+    threshold: 0.17
+  rerank:
+    # 重排服务配置（已在RerankService中定义默认值）
+    url: https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank
+    model: qwen3.7-text-rerank
+

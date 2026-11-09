@@ -8,7 +8,7 @@
   >
     <el-steps :active="currentStep" finish-status="success" align-center>
       <el-step title="参数配置" />
-      <el-step title="SQL配置与字段元数据" />
+      <el-step title="SQL配置" />
       <el-step title="发布作业" />
     </el-steps>
 
@@ -206,10 +206,6 @@
               <el-icon><Check /></el-icon>
               语法检查
             </el-button>
-            <el-button type="success" @click="handleParseSql" :loading="parsing">
-              <el-icon><Operation /></el-icon>
-              解析字段
-            </el-button>
           </el-form-item>
 
           <el-form-item v-if="syntaxResult">
@@ -220,74 +216,6 @@
               show-icon
               :closable="false"
             />
-          </el-form-item>
-
-          <el-divider content-position="left">字段元数据</el-divider>
-
-          <el-form-item>
-            <el-button type="primary" size="small" @click="handleAddField">
-              <el-icon><Plus /></el-icon>
-              添加字段
-            </el-button>
-            <el-button type="success" size="small" @click="handleAutoFill">
-              <el-icon><MagicStick /></el-icon>
-              AI智能填充
-            </el-button>
-          </el-form-item>
-
-          <el-form-item>
-            <el-table :data="fieldList" border stripe style="width: 100%">
-              <el-table-column type="index" label="序号" width="60" />
-              <el-table-column label="字段英文名" width="200">
-                <template #default="{ row }">
-                  <el-input
-                    v-model="row.fieldName"
-                    placeholder="字段英文名"
-                    size="small"
-                  />
-                </template>
-              </el-table-column>
-              <el-table-column label="字段中文名" width="200">
-                <template #default="{ row }">
-                  <el-input
-                    v-model="row.fieldComment"
-                    placeholder="字段中文名"
-                    size="small"
-                  />
-                </template>
-              </el-table-column>
-              <el-table-column label="字段类型" width="150">
-                <template #default="{ row }">
-                  <el-input
-                    v-model="row.fieldType"
-                    placeholder="如：string"
-                    size="small"
-                  />
-                </template>
-              </el-table-column>
-              <el-table-column label="主键" width="80" align="center">
-                <template #default="{ row }">
-                  <el-checkbox v-model="row.isPrimaryKey" />
-                </template>
-              </el-table-column>
-              <el-table-column label="分区键" width="80" align="center">
-                <template #default="{ row }">
-                  <el-checkbox v-model="row.isPartitionKey" />
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="80" align="center">
-                <template #default="{ $index }">
-                  <el-button
-                    type="danger"
-                    size="small"
-                    link
-                    @click="handleDeleteField($index)"
-                  >
-                    删除
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
           </el-form-item>
         </el-form>
       </div>
@@ -307,7 +235,6 @@
               <el-descriptions-item label="执行引擎">{{ paramForm.engineType }}</el-descriptions-item>
               <el-descriptions-item label="源库表">{{ paramForm.sourceDatabase }}.{{ paramForm.sourceTable }}</el-descriptions-item>
               <el-descriptions-item label="目标库表">{{ paramForm.targetDatabase }}.{{ paramForm.targetTable }}</el-descriptions-item>
-              <el-descriptions-item label="字段数量" :span="2">{{ fieldList.length }} 个</el-descriptions-item>
             </el-descriptions>
           </template>
         </el-result>
@@ -347,7 +274,8 @@ import { jobApi, jobVersionApi, fieldMetadataApi, datasourceApi, metadataApi, ai
 
 const props = defineProps({
   modelValue: Boolean,
-  jobId: Number
+  jobId: Number,
+  jobVersionId: Number
 })
 
 const emit = defineEmits(['update:modelValue', 'success'])
@@ -532,7 +460,7 @@ watch(() => props.modelValue, (val) => {
   visible.value = val
   if (val) {
     loadDatasources()
-    if (props.jobId) {
+    if (props.jobVersionId) {
       isEdit.value = true
       loadJobDetail()
     } else {
@@ -549,62 +477,57 @@ watch(visible, (val) => {
 // 加载作业详情
 const loadJobDetail = async () => {
   try {
-    // 获取作业基础信息
-    const job = await jobApi.getJobDetail(props.jobId)
+    // 直接获取版本详情（版本里已经包含作业的所有配置信息）
+    const version = await jobVersionApi.getVersionDetail(props.jobVersionId)
 
     // 填充参数表单
     Object.assign(paramForm, {
-      jobName: job.jobName,
-      jobCnName: job.jobCnName,
-      jobType: job.jobType,
-      sourceDatasourceId: job.sourceDatasourceId,
-      sourceDatabase: job.sourceDatabase,
-      sourceTable: job.sourceTable,
-      targetDatabase: job.targetDatabase,
-      targetTable: job.targetTable,
-      engineType: job.engineType || 'HIVE',
-      description: job.description || '',
-      scheduleFrequency: job.scheduleFrequency || null,
-      isMonitored: job.isMonitored !== undefined ? job.isMonitored : true
+      jobName: version.jobName,
+      jobCnName: version.jobCnName,
+      jobType: version.jobType,
+      sourceDatasourceId: version.sourceDatasourceId,
+      sourceDatabase: version.sourceDatabase,
+      sourceTable: version.sourceTable,
+      targetDatabase: version.targetDatabase,
+      targetTable: version.targetTable,
+      engineType: version.engineType || 'HIVE',
+      description: version.description || '',
+      scheduleFrequency: version.scheduleFrequency || null,
+      isMonitored: version.monitored !== undefined ? version.monitored : true
     })
 
-    // 记录 jobId 和当前版本ID
-    createdJobId.value = job.id
-    createdVersionId.value = job.currentVersion
+    // 记录 jobId 和版本ID
+    createdJobId.value = version.jobId
+    createdVersionId.value = version.id
 
     // 如果有数据源，加载库列表和表列表
-    if (job.sourceDatasourceId) {
+    if (version.sourceDatasourceId) {
       await loadDatabases()
-      if (job.sourceDatabase) {
+      if (version.sourceDatabase) {
         await loadTables()
         // 如果有表名，触发表选择以加载字段
-        if (job.sourceTable) {
-          handleTableChange(job.sourceTable)
+        if (version.sourceTable) {
+          handleTableChange(version.sourceTable)
         }
       }
     }
 
-    // 获取当前版本详情
-    if (job.currentVersion) {
-      const version = await jobVersionApi.getVersionDetail(job.currentVersion)
+    // 填充SQL表单
+    if (version.sqlContent) {
+      sqlForm.sqlContent = version.sqlContent
+      sqlForm.sparkConfig = version.sparkConfig || ''
+    }
 
-      // 填充SQL表单
-      if (version.sqlContent) {
-        sqlForm.sqlContent = version.sqlContent
-        sqlForm.sparkConfig = version.sparkConfig || ''
-      }
-
-      // 获取字段元数据
-      const fields = await fieldMetadataApi.getFieldList(job.currentVersion)
-      if (fields && fields.length > 0) {
-        fieldList.value = fields.map(f => ({
-          fieldName: f.fieldName,
-          fieldComment: f.fieldComment,
-          fieldType: f.fieldType,
-          isPrimaryKey: f.isPrimaryKey || false,
-          isPartitionKey: f.isPartitionKey || false
-        }))
-      }
+    // 获取字段元数据
+    const fields = await fieldMetadataApi.getFieldList(version.id)
+    if (fields && fields.length > 0) {
+      fieldList.value = fields.map(f => ({
+        fieldName: f.fieldName,
+        fieldComment: f.fieldComment,
+        fieldType: f.fieldType,
+        isPrimaryKey: f.isPrimaryKey || false,
+        isPartitionKey: f.isPartitionKey || false
+      }))
     }
 
     ElMessage.success('作业详情加载成功')
@@ -675,10 +598,10 @@ const handleNext = async () => {
     }
 
     // 验证字段元数据
-    if (fieldList.value.length === 0) {
-      ElMessage.warning('请至少添加一个字段')
-      return
-    }
+    // if (fieldList.value.length === 0) {
+    //   ElMessage.warning('请至少添加一个字段')
+    //   return
+    // }
 
     // 保存SQL配置
     try {
@@ -689,7 +612,7 @@ const handleNext = async () => {
       })
 
       // 保存字段元数据
-      await fieldMetadataApi.saveFields(createdVersionId.value, fieldList.value)
+      // await fieldMetadataApi.saveFields(createdVersionId.value, fieldList.value)
 
       ElMessage.success('SQL配置和字段元数据保存成功')
     } catch (error) {

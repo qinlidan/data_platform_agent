@@ -1,6 +1,8 @@
 package com.dataplatform.knowledge.service;
 
 import com.dataplatform.entity.LowConfidenceQuestion;
+import com.dataplatform.knowledge.confidence.ConfidenceGate;
+import com.dataplatform.knowledge.confidence.EvidenceConfidence;
 import com.dataplatform.knowledge.dto.CitationDetail;
 import com.dataplatform.knowledge.dto.HybridSearchResult;
 import com.dataplatform.knowledge.dto.RerankResult;
@@ -36,17 +38,20 @@ public class KnowledgeRetrieval {
     private final PromptBuilder promptBuilder;
     private final LowConfidenceQuestionMapper lowConfidenceQuestionMapper;
     private final CitationStore citationStore;
+    private final ConfidenceGate confidenceGate;
 
     public KnowledgeRetrieval(HybridSearchService hybridSearchService,
                               RerankService rerankService,
                               PromptBuilder promptBuilder,
                               LowConfidenceQuestionMapper lowConfidenceQuestionMapper,
-                              CitationStore citationStore) {
+                              CitationStore citationStore,
+                              ConfidenceGate confidenceGate) {
         this.hybridSearchService = hybridSearchService;
         this.rerankService = rerankService;
         this.promptBuilder = promptBuilder;
         this.lowConfidenceQuestionMapper = lowConfidenceQuestionMapper;
         this.citationStore = citationStore;
+        this.confidenceGate = confidenceGate;
     }
 
     /**
@@ -96,18 +101,17 @@ public class KnowledgeRetrieval {
         // 重排（RerankException 不捕获）
         List<RerankResult> reranked = rerankService.rerank(query, candidates, RERANK_TOP_N);
 
-        // 重排分拒答
-        Double topRelevance = (reranked == null || reranked.isEmpty()) ? null : reranked.get(0).getRelevanceScore();
-        if (topRelevance == null || topRelevance < rerankThreshold) {
-            String reason = topRelevance == null
-                ? String.format("重排无有效结果，阈值 %.2f", rerankThreshold)
-                : String.format("重排分数过低: %.4f < 阈值 %.2f", topRelevance, rerankThreshold);
-            log.warn("Refuse by rerank score, query: {}, {}", query, reason);
+        // 置信度闸检查
+        EvidenceConfidence confidence = confidenceGate.evaluate(reranked);
+        if (!confidence.getPassed()) {
+            String reason = confidence.getRejectionReason();
+            log.warn("Refuse by confidence gate, query: {}, {}", query, reason);
             recordLowConfidence(conversationId, query, reason);
             return Result.refused(RAGService.REFUSAL_LOW_RERANK);
         }
 
         String prompt = promptBuilder.buildPromptWithSearchResults(query, reranked);
+        Double topRelevance = confidence.getTopRelevanceScore();
         return Result.hit(prompt, reranked, topRelevance);
     }
 

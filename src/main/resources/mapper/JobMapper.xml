@@ -4,8 +4,8 @@
 
 <mapper namespace="com.dataplatform.mapper.JobMapper">
 
-    <!-- 分页查询作业列表 -->
-    <select id="selectJobPage" resultType="com.dataplatform.entity.Job">
+    <!-- 查询作业列表（支持多条件筛选 + 右模糊查询 + 分页） -->
+    <select id="selectJobList" resultType="com.dataplatform.entity.Job">
         SELECT
             id,
             job_name,
@@ -75,6 +75,44 @@
         </where>
         <!-- 按最后更新时间倒序排列 -->
         ORDER BY update_time DESC
+        <!-- 手动分页 -->
+        <if test="limit != null">
+            LIMIT #{limit}
+        </if>
+        <if test="offset != null">
+            OFFSET #{offset}
+        </if>
     </select>
 
+    <!-- 统计作业总数 -->
+    <select id="selectJobCount" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM etl_job
+        <where>
+            <if test="req.jobName != null and req.jobName != ''">
+                AND job_name LIKE CONCAT(#{req.jobName}, '%')
+            </if>
+            <if test="req.jobCnName != null and req.jobCnName != ''">
+                AND job_cn_name LIKE CONCAT(#{req.jobCnName}, '%')
+            </if>
+            <if test="req.jobType != null">
+                AND job_type = #{req.jobType}
+            </if>
+            <if test="req.status != null">
+                AND status = #{req.status}
+            </if>
+            <if test="req.sourceDatasourceId != null">
+                AND source_datasource_id = #{req.sourceDatasourceId}
+            </if>
+            <if test="req.sourceDatabase != null and req.sourceDatabase != ''">
+                AND source_database = #{req.sourceDatabase}
+            </if>
+            <if test="req.sourceTable != null and req.sourceTable != ''">
+                AND source_table LIKE CONCAT(#{req.sourceTable}, '%')
+            </if>
+            <if test="req.scheduleFrequency != null">
+                AND schedule_frequency = #{req.scheduleFrequency}
+            </if>
+        </where>
+    </select>
 </mapper>

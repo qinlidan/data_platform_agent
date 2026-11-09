@@ -35,6 +35,7 @@ class RAGServiceTest {
     @Mock ChatClient.Builder chatClientBuilder;
     @Mock LowConfidenceQuestionMapper mapper;
     @Mock CitationStore citationStore;
+    @Mock com.dataplatform.knowledge.confidence.ConfidenceGate confidenceGate;
 
     ChatClient chatClient;
     RAGService service;
@@ -44,7 +45,7 @@ class RAGServiceTest {
         chatClient = mock(ChatClient.class, Mockito.RETURNS_DEEP_STUBS);
         when(chatClientBuilder.build()).thenReturn(chatClient);
         KnowledgeRetrieval retrieval = new KnowledgeRetrieval(hybridSearchService, rerankService,
-            new PromptBuilder(), mapper, citationStore);
+            new PromptBuilder(), mapper, citationStore, confidenceGate);
         service = new RAGService(retrieval, chatClientBuilder);
     }
 

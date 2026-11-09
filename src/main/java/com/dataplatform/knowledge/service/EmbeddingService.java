@@ -84,4 +84,23 @@ public class EmbeddingService {
 
         return vector;
     }
+
+    /**
+     * 将向量格式化为 PostgreSQL vector 格式字符串
+     * 例如: [0.123, 0.456, ...]
+     *
+     * @param vector 向量数组
+     * @return PostgreSQL vector 格式字符串
+     */
+    public String formatVector(float[] vector) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < vector.length; i++) {
+            if (i > 0) {
+                sb.append(",");
+            }
+            sb.append(vector[i]);
+        }
+        sb.append("]");
+        return sb.toString();
+    }
 }

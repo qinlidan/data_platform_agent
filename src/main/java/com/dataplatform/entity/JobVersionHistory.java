@@ -3,6 +3,7 @@ package com.dataplatform.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import com.dataplatform.enums.VersionAction;
 import com.dataplatform.enums.VersionStatus;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Builder;
 import lombok.Data;
 
@@ -75,5 +76,6 @@ public class JobVersionHistory {
      * 操作时间
      */
     @TableField(fill = FieldFill.INSERT)
+      @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
 }

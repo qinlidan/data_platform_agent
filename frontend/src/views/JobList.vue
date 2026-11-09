@@ -101,17 +101,9 @@
         <el-table-column prop="sourceDatabase" label="源库名" width="150" />
         <el-table-column prop="sourceTable" label="源表名" width="150" />
         <el-table-column prop="targetDatabase" label="目标库名" width="150" />
-        <el-table-column prop="engineType" label="执行引擎" width="100" />
         <el-table-column prop="scheduleFrequency" label="调度频率" width="100">
           <template #default="{ row }">
             {{ frequencyMap[row.scheduleFrequency] || '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="isMonitored" label="是否监控" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.isMonitored ? 'success' : 'info'">
-              {{ row.isMonitored ? '是' : '否' }}
-            </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
@@ -192,13 +184,20 @@
         <!-- 使用说明 -->
         <el-alert
           v-if="messages.length === 0"
-          title="AI 助手"
+          title="AI 助手使用说明"
           type="info"
           :closable="false"
           class="usage-tips"
         >
           <div class="tips-content">
-            <p style="font-size: 12px; margin: 0;">💡 用自然语言创建和管理作业</p>
+            <p>💡 你可以用自然语言与 AI 助手对话，快速创建和管理作业：</p>
+            <ul>
+              <li>创建作业："帮我创建一个从 DB2 的 PRODDB.user_info 迁移到 Hive 的 dw.dim_user 的作业"</li>
+              <li>查询作业："查询作业 job_001 的详情"</li>
+              <li>更新作业："修改作业 job_001 的目标表为 dw.dim_user_v2"</li>
+              <li>查看列表："查看最近的作业列表"</li>
+            </ul>
+            <p class="warning-text">⚠️ 删除和发布作业需要二次确认</p>
           </div>
         </el-alert>
 
@@ -252,7 +251,7 @@
                   <el-table-column label="源 → 目标" min-width="180">
                     <template #default="{ row }">
                       <div style="font-size: 12px;">
-                        {{ row.sourceDatabase }}.{{ row.sourceTable }} → {{ row.targetDatabase }}.{{ row.targetTable }}
+                        {{ row.sourceTable }} → {{ row.targetTable }}
                       </div>
                     </template>
                   </el-table-column>
@@ -269,7 +268,25 @@
                 </el-table>
               </div>
               <!-- 普通文本消息 -->
-              <div v-else class="message-text" v-html="formatMessage(msg.content)"></div>
+              <div v-else class="message-text" v-html="formatMessageWithCitations(msg)"></div>
+
+              <!-- 参考来源：引用溯源 -->
+              <div v-if="msg.citations && msg.citations.length > 0" class="citation-list">
+                <div class="citation-title">参考来源</div>
+                <div
+                  v-for="c in msg.citations"
+                  :key="c.index"
+                  :class="['citation-item', { open: msg.citeOpen === c.index }]"
+                >
+                  <div class="citation-head" @click="toggleCite(msg, c.index)">
+                    <span class="citation-index">[{{ c.index }}]</span>
+                    <span class="citation-path">{{ shortSectionPath(c.sectionPath) || '参考资料 ' + c.index }}</span>
+                    <span class="citation-toggle">{{ msg.citeOpen === c.index ? '收起' : '展开原文' }}</span>
+                  </div>
+                  <!-- 原文展示 -->
+                  <div class="citation-body">{{ c.text }}</div>
+                </div>
+              </div>
 
               <!-- 确认按钮 -->
               <div v-if="msg.needConfirmation" class="confirmation-actions">
@@ -335,7 +352,7 @@
     <!-- 编辑对话框 -->
     <JobCreateDialog
       v-model="createDialogVisible"
-      :job-id="editJobId"
+      :job-version-id="editJobId"
       @success="handleSuccess"
     />
   </div>
@@ -350,6 +367,7 @@ import { jobApi } from '@/api'
 import request from '@/utils/request'
 import JobCreateDialog from './JobCreateDialog.vue'
 import JobTypeDialog from './JobTypeDialog.vue'
+import { renderCitationMarkers, shortSectionPath, escapeHtml } from '@/utils/citations'
 
 // 搜索表单
 const searchForm = reactive({
@@ -469,7 +487,7 @@ const handleJobTypeConfirm = ({ jobType, sourceDatasourceId }) => {
 
 // 编辑
 const handleEdit = (row) => {
-  editJobId.value = row.id
+  editJobId.value = row.jobVersionId
   createDialogVisible.value = true
 }
 
@@ -697,6 +715,23 @@ const sendMessage = async () => {
       getList() // 刷新作业列表
     })
 
+    // 监听 citations 事件：知识库引用信息
+    eventSource.addEventListener('citations', (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        console.log('收到 citations 事件:', data)
+        if (data.citations && Array.isArray(data.citations)) {
+          assistantMessage.citations = data.citations
+          // 强制 Vue 更新
+          nextTick(() => {
+            scrollToBottom()
+          })
+        }
+      } catch (err) {
+        console.error('解析 citations 事件失败:', err)
+      }
+    })
+
     // 监听 tool_start 事件：工具调用开始
     eventSource.addEventListener('tool_start', (e) => {
       try {
@@ -741,9 +776,10 @@ const sendMessage = async () => {
     // 监听 table_row 事件：追加表格行
     eventSource.addEventListener('table_row', (e) => {
       try {
-        const row = JSON.parse(e.data)
-        if (assistantMessage.jobListData && assistantMessage.jobListData.data) {
-          assistantMessage.jobListData.data.push(row)
+        const data = JSON.parse(e.data)
+        if (assistantMessage.jobListData && assistantMessage.jobListData.data && data.row) {
+          // 后端返回格式：{"type":"job_list","row":{...}}
+          assistantMessage.jobListData.data.push(data.row)
           scrollToBottom()
         }
       } catch (err) {
@@ -843,6 +879,30 @@ const formatMessage = (content) => {
     .replace(/```(.*?)```/gs, '<pre><code>$1</code></pre>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+}
+
+// 格式化消息并渲染引用标记
+const formatMessageWithCitations = (msg) => {
+  if (!msg || !msg.content) return ''
+
+  // 先格式化普通内容
+  let formatted = formatMessage(msg.content)
+
+  // 如果有引用，渲染引用标记
+  if (msg.citations && msg.citations.length > 0) {
+    formatted = renderCitationMarkers(formatted, msg.citations)
+  }
+
+  return formatted
+}
+
+// 切换引用原文展开/收起
+const toggleCite = (msg, index) => {
+  if (msg.citeOpen === index) {
+    msg.citeOpen = null
+  } else {
+    msg.citeOpen = index
+  }
 }
 
 // 滚动到底部
@@ -994,7 +1054,7 @@ const handleCancel = (msg) => {
 }
 
 .ai-assistant-panel {
-  width: 380px;
+  width: 570px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -1029,8 +1089,33 @@ const handleCancel = (msg) => {
 }
 
 .usage-tips {
-  margin-bottom: 12px;
-  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.tips-content {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.tips-content p {
+  margin: 8px 0;
+}
+
+.tips-content ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.tips-content li {
+  margin: 5px 0;
+  color: #606266;
+}
+
+.warning-text {
+  color: #e6a23c;
+  font-weight: 500;
+  margin-top: 8px;
+  margin-bottom: 0;
 }
 
 .chat-messages {
@@ -1092,6 +1177,96 @@ const handleCancel = (msg) => {
   border-radius: 3px;
   font-family: 'Courier New', monospace;
   font-size: 12px;
+}
+
+/* 引用上标样式 */
+.message-text :deep(.cite) {
+  color: #409eff;
+  cursor: help;
+  text-decoration: none;
+  font-weight: 600;
+  margin: 0 1px;
+}
+
+.message-text :deep(.cite:hover) {
+  color: #66b1ff;
+}
+
+/* 引用列表样式 */
+.citation-list {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e4e7ed;
+}
+
+.citation-title {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.citation-item {
+  margin-bottom: 8px;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.citation-item:hover {
+  border-color: #409eff;
+}
+
+.citation-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  background-color: #f9fafb;
+  transition: background-color 0.2s;
+}
+
+.citation-head:hover {
+  background-color: #ecf5ff;
+}
+
+.citation-index {
+  color: #409eff;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.citation-path {
+  flex: 1;
+  color: #606266;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.citation-toggle {
+  color: #909399;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.citation-body {
+  padding: 12px;
+  background-color: #fafafa;
+  border-top: 1px solid #e4e7ed;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #303133;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: none;
+}
+
+.citation-item.open .citation-body {
+  display: block;
 }
 
 .tool-badges {

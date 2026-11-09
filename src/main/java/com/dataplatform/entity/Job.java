@@ -5,6 +5,7 @@ import com.dataplatform.enums.EngineType;
 import com.dataplatform.enums.JobStatus;
 import com.dataplatform.enums.JobType;
 import com.dataplatform.enums.ScheduleFrequency;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.Getter;
@@ -58,21 +59,21 @@ public class Job {
     private Boolean monitored;
 
     /**
-     * 当前版本号（最新版本，可能是草稿）
+     * 当前版本ID（etl_job_version表主键，直接引用最新版本记录）
+     * 创建作业时初始为随机负数，版本记录生成后更新为真实ID
      */
-    private Integer currentVersion;
-
-    /**
-     * 当前版本ID（etl_job_version表的主键，用于前端查询版本详情）
-     * 非数据库字段，由Service层填充
-     */
-    @TableField(exist = false)
-    private Long currentVersionId;
+    private Long jobVersionId;
 
     /**
      * 线上运行版本号（只在新创建、发布、回滚时更新）
      */
     private Integer onlineVersion;
+
+    /**
+     * 当前版本号（虚拟字段，从 JobVersion 表关联查询）
+     */
+    @TableField(exist = false)
+    private Integer currentVersion;
 
     /**
      * 作业状态
@@ -84,12 +85,15 @@ public class Job {
     /**
      * 最后发布时间
      */
+      @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime lastPublishTime;
 
     @TableField(fill = FieldFill.INSERT)
+      @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
+      @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updateTime;
 
     @TableField(fill = FieldFill.INSERT)
@@ -117,12 +121,12 @@ public class Job {
 
     /**
      * 判断是否有未发布的变更
+     * @deprecated 重构后使用 jobVersionId，不再依赖版本号比较
      */
+    @Deprecated
     public boolean hasPendingChanges() {
-        if (onlineVersion == null) {
-            return currentVersion != null && currentVersion > 0;
-        }
-        return currentVersion != null && currentVersion > onlineVersion;
+        // 需要通过 jobVersionId 查询版本状态判断
+        return false;
     }
 
     /**
@@ -134,8 +138,10 @@ public class Job {
 
     /**
      * 判断是否已发布
+     * @deprecated 重构后使用 jobVersionId 查询版本状态
      */
+    @Deprecated
     public boolean isPublished() {
-        return onlineVersion != null && onlineVersion.equals(currentVersion);
+        return onlineVersion != null;
     }
 }

@@ -185,6 +185,147 @@
     "query": "MaxCompute 的 odps.sql.mapper.memory 能设置的最大值是多少",
     "category": "error_keyword",
     "docType": "",
-    "groundTruth": []
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "Spark 的 Catalyst 优化器原理是什么",
+    "category": "adjacent",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "如何在 Spark 中使用 Delta Lake",
+    "category": "adjacent",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "Hive 表迁移到 Iceberg 怎么操作",
+    "category": "adjacent",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "平台支持 GPU 资源调度吗",
+    "category": "adjacent",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "任务可以配置优先级队列吗",
+    "category": "adjacent",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "如何配置任务的资源标签亲和性",
+    "category": "adjacent",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "平台支持 Trino 引擎吗",
+    "category": "adjacent",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "能不能用 Presto 替代 Spark 执行查询",
+    "category": "adjacent",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "Hudi 表的增量读取怎么配置",
+    "category": "adjacent",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "ZooKeeper 连接超时怎么排查",
+    "category": "adjacent",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "平台有审计日志功能吗",
+    "category": "adjacent",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "能否通过 Docker 镜像自定义执行环境",
+    "category": "adjacent",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "平台支持跨项目的表权限共享吗",
+    "category": "adjacent",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "如何设置任务的 SLA 告警",
+    "category": "adjacent",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "spark.memory.offHeap.size 参数的推荐值是多少",
+    "category": "trap",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "AQE 自动合并小文件的阈值默认是多少 MB",
+    "category": "trap",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "spark.shuffle.file.buffer 最大可以设置到多少 KB",
+    "category": "trap",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "任务实例的超时时间上限是多少小时",
+    "category": "trap",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "数据质量规则最多能配置几条",
+    "category": "trap",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
+  },
+  {
+    "query": "工作流最多支持多少个节点",
+    "category": "trap",
+    "docType": "",
+    "groundTruth": [],
+    "shouldAnswer": false
   }
 ]

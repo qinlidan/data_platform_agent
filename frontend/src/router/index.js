@@ -32,10 +32,22 @@ const routes = [
         meta: { title: '编辑数据源' }
       },
       {
-        path: '/ai',
-        name: 'AiAssistant',
-        component: () => import('@/views/AiAssistant.vue'),
-        meta: { title: 'AI 智能助手' }
+        path: '/knowledge',
+        name: 'KnowledgeManagement',
+        component: () => import('@/views/KnowledgeManagement.vue'),
+        meta: { title: '知识库管理' }
+      },
+      {
+        path: '/evaluation',
+        name: 'RetrievalEvaluation',
+        component: () => import('@/views/RetrievalEvaluation.vue'),
+        meta: { title: '检索评估' }
+      },
+      {
+        path: '/confidence/calibrate',
+        name: 'ConfidenceCalibration',
+        component: () => import('@/views/ConfidenceCalibration.vue'),
+        meta: { title: '置信度阈值标定' }
       }
     ]
   }

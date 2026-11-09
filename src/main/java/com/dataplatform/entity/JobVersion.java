@@ -1,8 +1,11 @@
 package com.dataplatform.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.dataplatform.enums.EngineType;
+import com.dataplatform.enums.JobType;
 import com.dataplatform.enums.ScheduleFrequency;
 import com.dataplatform.enums.VersionStatus;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -50,6 +53,11 @@ public class JobVersion {
     private String jobCnName;
 
     /**
+     * 作业类型（快照）
+     */
+    private JobType jobType;
+
+    /**
      * 源数据源ID
      */
     private Long sourceDatasourceId;
@@ -88,6 +96,11 @@ public class JobVersion {
      * Spark配置（JSON格式）
      */
     private String sparkConfig;
+
+    /**
+     * 引擎类型（快照）
+     */
+    private EngineType engineType;
 
     /**
      * 调度频率：DAILY/WEEKLY/MONTHLY/YEARLY
@@ -138,11 +151,13 @@ public class JobVersion {
     /**
      * 提交时间
      */
+      @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime submitTime;
 
     /**
      * 发布时间
      */
+      @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime publishTime;
 
     // ========== 回滚相关 ==========

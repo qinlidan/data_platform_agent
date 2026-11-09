@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>引用溯源测试</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .message-text {
+      background: white;
+      padding: 16px;
+      border-radius: 8px;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+    .cite {
+      color: #409eff;
+      cursor: help;
+      text-decoration: none;
+      font-weight: 600;
+      margin: 0 1px;
+    }
+    .cite:hover {
+      color: #66b1ff;
+    }
+    .citation-list {
+      background: white;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 16px;
+    }
+    .citation-title {
+      font-size: 12px;
+      color: #909399;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .citation-item {
+      margin-bottom: 8px;
+      border: 1px solid #e4e7ed;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .citation-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      background-color: #f9fafb;
+    }
+    .citation-head:hover {
+      background-color: #ecf5ff;
+    }
+    .citation-index {
+      color: #409eff;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .citation-path {
+      flex: 1;
+      color: #606266;
+    }
+    .citation-toggle {
+      color: #909399;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .citation-body {
+      padding: 12px;
+      background-color: #fafafa;
+      border-top: 1px solid #e4e7ed;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #303133;
+      white-space: pre-wrap;
+      word-break: break-word;
+      display: none;
+    }
+    .citation-item.open .citation-body {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <h2>引用溯源测试页面</h2>
+
+  <div class="message-text">
+    <p>根据知识库资料，Spark 性能调优需要关注以下几个方面：</p>
+    <p>1. Executor 内存配置<sup class="cite" title="Spark 性能调优 > 资源配置 > executor memory">[1]</sup>建议设置为 4-8GB</p>
+    <p>2. 并行度设置<sup class="cite" title="Spark 性能调优 > 并行度配置">[2]</sup>应该是 CPU 核心数的 2-3 倍</p>
+    <p>3. 数据倾斜处理<sup class="cite" title="Spark 性能调优 > 常见问题 > 数据倾斜">[3]</sup>可以使用加盐技术</p>
+  </div>
+
+  <div class="citation-list">
+    <div class="citation-title">参考来源</div>
+
+    <div class="citation-item">
+      <div class="citation-head" onclick="toggleItem(this)">
+        <span class="citation-index">[1]</span>
+        <span class="citation-path">…> 资源配置 > executor memory</span>
+        <span class="citation-toggle">展开原文</span>
+      </div>
+      <div class="citation-body">Executor 内存是 Spark 作业性能的关键参数。建议根据数据量和计算复杂度，将 executor-memory 设置为 4-8GB。过小会导致频繁的 GC，过大会浪费集群资源。</div>
+    </div>
+
+    <div class="citation-item">
+      <div class="citation-head" onclick="toggleItem(this)">
+        <span class="citation-index">[2]</span>
+        <span class="citation-path">…> 并行度配置</span>
+        <span class="citation-toggle">展开原文</span>
+      </div>
+      <div class="citation-body">Spark 的并行度（spark.default.parallelism）应该设置为 CPU 核心总数的 2-3 倍，以充分利用集群资源。对于 shuffle 操作，还需要设置 spark.sql.shuffle.partitions。</div>
+    </div>
+
+    <div class="citation-item">
+      <div class="citation-head" onclick="toggleItem(this)">
+        <span class="citation-index">[3]</span>
+        <span class="citation-path">…> 常见问题 > 数据倾斜</span>
+        <span class="citation-toggle">展开原文</span>
+      </div>
+      <div class="citation-body">数据倾斜是 Spark 作业性能问题的常见原因。当某些 task 处理的数据量远大于其他 task 时，就会出现数据倾斜。解决方法包括：1) 加盐（salting）技术 2) 调整分区键 3) 使用两阶段聚合。</div>
+    </div>
+  </div>
+
+  <script>
+    function toggleItem(headEl) {
+      const item = headEl.parentElement
+      const toggle = headEl.querySelector('.citation-toggle')
+
+      if (item.classList.contains('open')) {
+        item.classList.remove('open')
+        toggle.textContent = '展开原文'
+      } else {
+        item.classList.add('open')
+        toggle.textContent = '收起'
+      }
+    }
+  </script>
+</body>
+</html>

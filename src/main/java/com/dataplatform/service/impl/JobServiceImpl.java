@@ -89,7 +89,8 @@ public class JobServiceImpl implements JobService {
         Job job = new Job();
         BeanUtils.copyProperties(request, job);
         job.setStatus(JobStatus.DRAFT);
-        job.setCurrentVersion(0);
+        // 使用随机负数作为占位符，版本创建后再更新
+        job.setJobVersionId((long) (Math.random() * -1000000));
         job.setCreatorId(creatorUserId); // 设置创建者ID
 
         jobMapper.insert(job);
@@ -100,13 +101,23 @@ public class JobServiceImpl implements JobService {
         version.setVersion(1);
         version.setStatus(VersionStatus.DRAFT);
         version.setChangeLog("初始版本");
-        // 复制调度频率和监控状态到版本
+        // 复制作业配置到版本
+        version.setJobName(job.getJobName());
+        version.setJobCnName(job.getJobCnName());
+        version.setJobType(job.getJobType());
+        version.setEngineType(job.getEngineType());
+        version.setSourceDatasourceId(job.getSourceDatasourceId());
+        version.setSourceDatabase(job.getSourceDatabase());
+        version.setSourceTable(job.getSourceTable());
+        version.setTargetDatabase(job.getTargetDatabase());
+        version.setTargetTable(job.getTargetTable());
         version.setScheduleFrequency(job.getScheduleFrequency());
         version.setMonitored(job.getMonitored());
+        version.setDescription(job.getDescription());
         jobVersionMapper.insert(version);
 
-        // 更新作业当前版本
-        job.setCurrentVersion(1);
+        // 更新作业的 jobVersionId 为真实版本ID
+        job.setJobVersionId(version.getId());
         jobMapper.updateById(job);
 
         return job;
@@ -190,7 +201,7 @@ public class JobServiceImpl implements JobService {
         List<JobVersion> versions = jobVersionMapper.selectList(wrapper);
         for (JobVersion version : versions) {
             // 删除版本的字段元数据
-            fieldMetadataService.deleteByVersionId(version.getId());
+//            fieldMetadataService.deleteByVersionId(version.getId());
             // 删除版本
             jobVersionMapper.deleteById(version.getId());
         }
@@ -213,46 +224,32 @@ public class JobServiceImpl implements JobService {
         int pageNum = request.getPageNum() != null ? request.getPageNum() : 1;
         int pageSize = request.getPageSize() != null ? request.getPageSize() : 10;
 
+        // 计算分页参数
+        Integer limit = pageSize;
+        Integer offset = (pageNum - 1) * pageSize;
+
+        // 查询数据列表
+        List<Job> jobs = jobMapper.selectJobList(request, limit, offset);
+
+        // 查询总数
+        Long total = jobMapper.selectJobCount(request);
+
+        // 填充分页对象
         Page<Job> page = new Page<>(pageNum, pageSize);
-        LambdaQueryWrapper<Job> wrapper = new LambdaQueryWrapper<>();
+        page.setRecords(jobs);
+        page.setTotal(total);
 
-        // 作业类型筛选
-        if (request.getJobType() != null) {
-            wrapper.eq(Job::getJobType, request.getJobType());
-        }
+        // 填充 currentVersion（从 JobVersion 表查询版本号）
+        page.getRecords().forEach(job -> {
+            if (job.getJobVersionId() != null) {
+                JobVersion version = jobVersionMapper.selectById(job.getJobVersionId());
+                if (version != null) {
+                    job.setCurrentVersion(version.getVersion());
+                }
+            }
+        });
 
-        // 作业状态筛选
-        if (request.getStatus() != null) {
-            wrapper.eq(Job::getStatus, request.getStatus());
-        }
-
-        // 源数据源ID筛选
-        if (request.getSourceDatasourceId() != null) {
-            wrapper.eq(Job::getSourceDatasourceId, request.getSourceDatasourceId());
-        }
-
-        // 源库名筛选
-        if (StringUtils.hasText(request.getSourceDatabase())) {
-            wrapper.eq(Job::getSourceDatabase, request.getSourceDatabase());
-        }
-
-        // 源表名筛选
-        if (StringUtils.hasText(request.getSourceTable())) {
-            wrapper.like(Job::getSourceTable, request.getSourceTable());
-        }
-
-        // 作业频率筛选
-        if (request.getScheduleFrequency() != null) {
-            wrapper.eq(Job::getScheduleFrequency, request.getScheduleFrequency());
-        }
-
-        wrapper.orderByDesc(Job::getCreateTime);
-        Page<Job> result = jobMapper.selectPage(page, wrapper);
-
-        // 填充 currentVersionId
-        fillCurrentVersionIds(result.getRecords());
-
-        return result;
+        return page;
     }
 
     @Override
@@ -278,10 +275,10 @@ public class JobServiceImpl implements JobService {
             throw new BusinessException("版本未配置SQL，无法发布");
         }
 
-        // 检查字段元数据
-        if (fieldMetadataService.listByVersionId(jobVersion.getId()).isEmpty()) {
-            throw new BusinessException("版本未配置字段元数据，无法发布");
-        }
+//        // 检查字段元数据
+//        if (fieldMetadataService.listByVersionId(jobVersion.getId()).isEmpty()) {
+//            throw new BusinessException("版本未配置字段元数据，无法发布");
+//        }
 
         // 取消之前的发布版本
         LambdaQueryWrapper<JobVersion> publishedWrapper = new LambdaQueryWrapper<>();
@@ -314,33 +311,5 @@ public class JobServiceImpl implements JobService {
         // 更新作业状态
         job.setStatus(JobStatus.ARCHIVED);
         jobMapper.updateById(job);
-    }
-
-    /**
-     * 批量填充作业的 currentVersionId
-     */
-    private void fillCurrentVersionIds(List<Job> jobs) {
-        if (jobs == null || jobs.isEmpty()) {
-            return;
-        }
-
-        log.info("[fillCurrentVersionIds] 开始填充 {} 个作业的版本ID", jobs.size());
-        for (Job job : jobs) {
-            if (job.getCurrentVersion() != null) {
-                LambdaQueryWrapper<JobVersion> wrapper = new LambdaQueryWrapper<>();
-                wrapper.eq(JobVersion::getJobId, job.getId())
-                       .eq(JobVersion::getVersion, job.getCurrentVersion())
-                       .select(JobVersion::getId);
-                JobVersion version = jobVersionMapper.selectOne(wrapper);
-                if (version != null) {
-                    job.setCurrentVersionId(version.getId());
-                    log.info("[fillCurrentVersionIds] job_id={}, current_version={}, current_version_id={}",
-                             job.getId(), job.getCurrentVersion(), version.getId());
-                } else {
-                    log.warn("[fillCurrentVersionIds] 未找到版本：job_id={}, current_version={}",
-                             job.getId(), job.getCurrentVersion());
-                }
-            }
-        }
     }
 }

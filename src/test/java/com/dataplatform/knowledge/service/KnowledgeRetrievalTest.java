@@ -47,13 +47,14 @@ class KnowledgeRetrievalTest {
     @Mock RerankService rerankService;
     @Mock LowConfidenceQuestionMapper mapper;
     @Mock CitationStore citationStore;
+    @Mock com.dataplatform.knowledge.confidence.ConfidenceGate confidenceGate;
 
     KnowledgeRetrieval retrieval;
 
     @BeforeEach
     void setUp() {
         retrieval = new KnowledgeRetrieval(hybridSearchService, rerankService, new PromptBuilder(),
-            mapper, citationStore);
+            mapper, citationStore, confidenceGate);
     }
 
     private static HybridSearchResult cand(long id, double vectorSim) {

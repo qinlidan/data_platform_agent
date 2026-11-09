@@ -10,7 +10,10 @@ import org.springframework.scheduling.annotation.EnableAsync;
  */
 @SpringBootApplication
 @EnableAsync
-@MapperScan({"com.dataplatform.mapper", "com.dataplatform.auth.mapper"})
+@MapperScan(
+    basePackages = {"com.dataplatform.mapper", "com.dataplatform.auth.mapper"},
+    sqlSessionFactoryRef = "mysqlSqlSessionFactory"
+)
 public class DataPlatformApplication {
 
     public static void main(String[] args) {

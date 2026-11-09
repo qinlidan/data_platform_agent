@@ -15,6 +15,11 @@ public enum MessageRole {
     ASSISTANT,
 
     /**
+     * 系统消息
+     */
+    SYSTEM,
+
+    /**
      * 工具消息
      */
     TOOL

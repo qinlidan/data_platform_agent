@@ -2,12 +2,10 @@ package com.dataplatform.enums;
 
 import com.baomidou.mybatisplus.annotation.EnumValue;
 import com.fasterxml.jackson.annotation.JsonValue;
-import lombok.Getter;
 
 /**
  * 执行引擎类型枚举
  */
-@Getter
 public enum EngineType {
 
     HIVE("HIVE", "Hive引擎"),
@@ -22,6 +20,14 @@ public enum EngineType {
     EngineType(String code, String description) {
         this.code = code;
         this.description = description;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public String getDescription() {
+        return description;
     }
 
     public static EngineType fromCode(String code) {

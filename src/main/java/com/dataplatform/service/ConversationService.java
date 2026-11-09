@@ -41,7 +41,8 @@ public class ConversationService extends ServiceImpl<ConversationMapper, Convers
         conversation.setUserId(userId);
         conversation.setTitle(title != null ? title : "新会话");
         conversation.setStatus(ConversationStatus.ACTIVE);
-
+        conversation.setCreatedAt(LocalDateTime.now());
+        conversation.setUpdatedAt(LocalDateTime.now());
         save(conversation);
         log.debug("[ConversationService] Created new conversation: id={}, userId={}", conversationId, userId);
 

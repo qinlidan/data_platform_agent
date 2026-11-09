@@ -525,28 +525,28 @@ const handleAutoFill = async () => {
 // 保存并发布
 const publishing = ref(false)
 const handlePublish = async () => {
-  if (fieldList.value.length === 0) {
-    ElMessage.warning('请至少添加一个字段')
-    return
-  }
-  for (const field of fieldList.value) {
-    if (!field.fieldName || !field.fieldComment) {
-      ElMessage.warning('请完善所有字段的英文名和中文名')
-      return
-    }
-  }
+  // if (fieldList.value.length === 0) {
+  //   ElMessage.warning('请至少添加一个字段')
+  //   return
+  // }
+  // for (const field of fieldList.value) {
+  //   if (!field.fieldName || !field.fieldComment) {
+  //     ElMessage.warning('请完善所有字段的英文名和中文名')
+  //     return
+  //   }
+  // }
 
   publishing.value = true
-  try {
-    await fieldMetadataApi.saveFields(createdVersionId.value, fieldList.value)
-    await jobVersionApi.publishVersion(createdVersionId.value)
-    ElMessage.success('作业发布成功！')
-    router.push('/job/list')
-  } catch (error) {
-    console.error('发布失败', error)
-  } finally {
-    publishing.value = false
-  }
+  // try {
+  //   await fieldMetadataApi.saveFields(createdVersionId.value, fieldList.value)
+  //   await jobVersionApi.publishVersion(createdVersionId.value)
+  //   ElMessage.success('作业发布成功！')
+  //   router.push('/job/list')
+  // } catch (error) {
+  //   console.error('发布失败', error)
+  // } finally {
+  //   publishing.value = false
+  // }
 }
 
 // 取消

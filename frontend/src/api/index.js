@@ -22,14 +22,6 @@ export const jobApi = {
     })
   },
 
-  // 获取作业详情
-  getJobDetail(id) {
-    return request({
-      url: `/jobs/${id}`,
-      method: 'get'
-    })
-  },
-
   // 更新作业
   updateJob(id, data) {
     return request({
@@ -273,6 +265,38 @@ export const aiApi = {
       url: '/nl/chat',
       method: 'post',
       data: { message }
+    })
+  }
+}
+
+/**
+ * 检索评估 API（对应后端 /api/knowledge/evaluation）
+ */
+export const evaluationApi = {
+  // 获取服务端评估集
+  getCases() {
+    return request({
+      url: '/knowledge/evaluation/cases',
+      method: 'get'
+    })
+  },
+
+  // 运行评估：会逐题调用收费的重排接口，耗时可达数分钟，单独放大超时
+  run(cases) {
+    return request({
+      url: '/knowledge/evaluation/run',
+      method: 'post',
+      data: cases ? { cases } : {},
+      timeout: 300000
+    })
+  },
+
+  // 标注辅助：按关键词查候选 chunk
+  getCandidates(keyword, limit = 20) {
+    return request({
+      url: '/knowledge/evaluation/candidates',
+      method: 'get',
+      params: { keyword, limit }
     })
   }
 }

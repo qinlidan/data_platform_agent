@@ -2,11 +2,28 @@ spring:
   application:
     name: data-platform-test
 
+  # 测试环境数据源配置
   datasource:
-    driver-class-name: org.h2.Driver
-    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password:
+    # MySQL 主数据源（用H2模拟）
+    mysql:
+      driver-class-name: org.h2.Driver
+      jdbc-url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+      username: sa
+      password:
+    # PostgreSQL 向量库数据源（测试时也用H2模拟）
+    postgres:
+      driver-class-name: org.h2.Driver
+      jdbc-url: jdbc:h2:mem:vectordb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+      username: sa
+      password:
+      jpa:
+        hibernate:
+          ddl-auto: create-drop
+        show-sql: false
+        properties:
+          hibernate:
+            dialect: org.hibernate.dialect.H2Dialect
+            format_sql: false
 
   h2:
     console:
@@ -18,12 +35,29 @@ spring:
     serialization:
       write-dates-as-timestamps: false
 
+  # Flyway 配置（测试环境-禁用）
+  flyway:
+    enabled: false
+
+  # 使用schema.sql初始化H2
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
   ai:
     openai:
       api-key: test-key
       base-url: https://api.openai.com
       chat:
         enabled: false
+    # DashScope 配置（用于 Embedding 测试）
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY}
+      embedding:
+        enabled: true
+        options:
+          model: text-embedding-v3
 
   # 邮件配置（测试环境）
   mail:

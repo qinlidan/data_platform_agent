@@ -50,4 +50,14 @@ public class JobQueryRequest {
      * 调度频率：DAILY、WEEKLY、MONTHLY、YEARLY
      */
     private ScheduleFrequency scheduleFrequency;
+
+    /**
+     * 作业名称（支持右模糊查询）
+     */
+    private String jobName;
+
+    /**
+     * 作业中文名称（支持右模糊查询）
+     */
+    private String jobCnName;
 }

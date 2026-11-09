@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>置信度闸 - 低置信度问题池</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: white;
+            padding: 24px;
+            margin-bottom: 24px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            color: #1a1a1a;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .stat-detail {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+
+        .actions {
+            background: white;
+            padding: 16px 24px;
+            margin-bottom: 24px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        button {
+            background: #0066ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #0052cc;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #f5f5f5;
+        }
+
+        .question-table {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #fafafa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+        }
+
+        td {
+            padding: 16px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .question-text {
+            font-weight: 500;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+
+        .reason-text {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .source-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .source-retrieval {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .source-selfcheck {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .timestamp {
+            color: #999;
+            font-size: 13px;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 24px;
+            padding: 16px;
+        }
+
+        .pagination a {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #333;
+            transition: all 0.2s;
+        }
+
+        .pagination a:hover {
+            background: #f5f5f5;
+        }
+
+        .pagination .active {
+            background: #0066ff;
+            color: white;
+            border-color: #0066ff;
+        }
+
+        .calibration-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 32px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal-header {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .calibration-result {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+        }
+
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .result-row:last-child {
+            border-bottom: none;
+        }
+
+        .result-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .result-value {
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 24px;
+            color: #666;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚪 置信度闸管理</h1>
+            <p class="subtitle">检索证据置信度低的问题会被拦截并记录在此，用于分析和优化</p>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">总拦截数</div>
+                <div class="stat-value" id="totalCount" th:text="${total}">0</div>
+                <div class="stat-detail">自启动以来累计</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">检索置信度低</div>
+                <div class="stat-value" id="retrievalCount">-</div>
+                <div class="stat-detail">来源: retrieval_low_conf</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">模型自评拒答</div>
+                <div class="stat-value" id="selfCheckCount">-</div>
+                <div class="stat-detail">来源: self_check</div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button onclick="startCalibration()">📊 标定置信度阈值</button>
+            <button class="btn-secondary" onclick="location.reload()">🔄 刷新</button>
+            <span style="margin-left: auto; color: #666; font-size: 14px;">
+                当前阈值配置: knowledge.confidence.threshold
+            </span>
+        </div>
+
+        <div class="question-table">
+            <table th:if="${questions != null and !questions.isEmpty()}">
+                <thead>
+                    <tr>
+                        <th style="width: 60px">ID</th>
+                        <th>问题 & 拒答原因</th>
+                        <th style="width: 150px">来源</th>
+                        <th style="width: 100px">会话ID</th>
+                        <th style="width: 180px">时间</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="q : ${questions}">
+                        <td th:text="${q.id}">1</td>
+                        <td>
+                            <div class="question-text" th:text="${q.rawQuestion}">问题文本</div>
+                            <div class="reason-text" th:text="${q.reason}">拒答原因</div>
+                        </td>
+                        <td>
+                            <span class="source-badge"
+                                  th:classappend="${q.source == 'retrieval_low_conf'} ? 'source-retrieval' : 'source-selfcheck'"
+                                  th:text="${q.source}">retrieval_low_conf</span>
+                        </td>
+                        <td th:text="${q.conversationId}">-</td>
+                        <td class="timestamp" th:text="${#temporals.format(q.createdAt, 'yyyy-MM-dd HH:mm:ss')}">2024-01-01 12:00:00</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="empty-state" th:if="${questions == null or questions.isEmpty()}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M9 11l3 3L22 4" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <p style="font-size: 16px; margin-bottom: 8px;">暂无拦截记录</p>
+                <p style="font-size: 14px;">所有问题的检索置信度都通过了闸门检查</p>
+            </div>
+
+            <div class="pagination" th:if="${pages > 1}">
+                <a th:if="${current > 1}" th:href="@{/confidence/pool(page=${current - 1})}">上一页</a>
+                <a th:each="i : ${#numbers.sequence(1, pages)}"
+                   th:href="@{/confidence/pool(page=${i})}"
+                   th:text="${i}"
+                   th:classappend="${i == current} ? 'active' : ''">1</a>
+                <a th:if="${current < pages}" th:href="@{/confidence/pool(page=${current + 1})}">下一页</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 标定结果弹窗 -->
+    <div class="calibration-modal" id="calibrationModal">
+        <div class="modal-content">
+            <div class="modal-header">阈值标定结果</div>
+            <div class="loading" id="calibrationLoading">正在标定，请稍候...</div>
+            <div class="calibration-result" id="calibrationResult" style="display: none;">
+                <div class="result-row">
+                    <span class="result-label">推荐阈值</span>
+                    <span class="result-value" id="threshold">-</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">准确率</span>
+                    <span class="result-value" id="accuracy">-</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">召回率</span>
+                    <span class="result-value" id="recall">-</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">拒答率</span>
+                    <span class="result-value" id="rejectionRate">-</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">Youden指数</span>
+                    <span class="result-value" id="youdenIndex">-</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">评估样本数</span>
+                    <span class="result-value" id="totalSamples">-</span>
+                </div>
+            </div>
+            <button onclick="closeCalibration()" style="width: 100%; margin-top: 16px;">关闭</button>
+        </div>
+    </div>
+
+    <script>
+        // 加载统计数据
+        fetch('/confidence/stats')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('totalCount').textContent = data.total;
+                document.getElementById('retrievalCount').textContent = data.retrievalLowConf;
+                document.getElementById('selfCheckCount').textContent = data.selfCheck;
+            })
+            .catch(e => console.error('Failed to load stats', e));
+
+        // 标定阈值
+        function startCalibration() {
+            const modal = document.getElementById('calibrationModal');
+            modal.style.display = 'flex';
+            document.getElementById('calibrationLoading').style.display = 'block';
+            document.getElementById('calibrationResult').style.display = 'none';
+
+            fetch('/confidence/calibrate', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('calibrationLoading').style.display = 'none';
+                    document.getElementById('calibrationResult').style.display = 'block';
+                    document.getElementById('threshold').textContent = data.recommendedThreshold.toFixed(2);
+                    document.getElementById('accuracy').textContent = (data.accuracy * 100).toFixed(1) + '%';
+                    document.getElementById('recall').textContent = (data.recall * 100).toFixed(1) + '%';
+                    document.getElementById('rejectionRate').textContent = (data.rejectionRate * 100).toFixed(1) + '%';
+                    document.getElementById('youdenIndex').textContent = data.youdenIndex.toFixed(3);
+                    document.getElementById('totalSamples').textContent = data.totalSamples;
+                })
+                .catch(e => {
+                    alert('标定失败: ' + e);
+                    closeCalibration();
+                });
+        }
+
+        function closeCalibration() {
+            document.getElementById('calibrationModal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

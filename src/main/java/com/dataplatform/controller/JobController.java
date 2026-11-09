@@ -48,12 +48,6 @@ public class JobController {
         return ApiResponse.success();
     }
 
-    @Operation(summary = "查询作业详情")
-    @GetMapping("/{id}")
-    public ApiResponse<Job> getById(@PathVariable Long id) {
-        return ApiResponse.success(jobService.getById(id));
-    }
-
     @Operation(summary = "分页查询作业列表")
     @GetMapping
     public ApiResponse<Page<Job>> page(JobQueryRequest request) {
