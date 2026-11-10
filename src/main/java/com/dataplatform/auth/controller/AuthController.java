@@ -42,11 +42,22 @@ public class AuthController {
     }
 
     /**
+    /**
      * 用户登录
      */
     @PostMapping("/login")
     public Result<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
+        return Result.success(response);
+    }
+
+    /**
+     * 游客登录（演示模式）
+     */
+    @PostMapping("/guest-login")
+    public Result<AuthResponse> guestLogin() {
+        log.info("游客登录请求");
+        AuthResponse response = authService.guestLogin();
         return Result.success(response);
     }
 

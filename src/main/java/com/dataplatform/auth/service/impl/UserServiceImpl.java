@@ -30,6 +30,32 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public User findByUsernameOrEmail(String usernameOrEmail) {
+        if (usernameOrEmail == null || usernameOrEmail.isEmpty()) {
+            return null;
+        }
+
+        // 如果包含@，按邮箱查询
+        if (usernameOrEmail.contains("@")) {
+            return findByEmail(usernameOrEmail);
+        }
+
+        // 否则尝试多种匹配方式
+        // 1. 先尝试按 ID 查询（用于 admin 这样的特殊账号）
+        User user = userMapper.selectById(usernameOrEmail);
+        if (user != null) {
+            return user;
+        }
+
+        // 2. 尝试匹配邮箱前缀（@之前的部分）
+        return userMapper.selectOne(
+            new LambdaQueryWrapper<User>()
+                .likeRight(User::getEmail, usernameOrEmail + "@")
+                .last("LIMIT 1")
+        );
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public User createUser(String email, String encryptedPassword) {
         User user = new User();

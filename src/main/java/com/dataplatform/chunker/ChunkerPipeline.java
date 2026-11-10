@@ -19,8 +19,8 @@ import java.util.regex.Pattern;
 @Service
 public class ChunkerPipeline {
 
-    private static final int MAX_CHUNK_SIZE = 400;       // 块大小上限
-    private static final int OVERLAP_SIZE = 60;          // 重叠字符数
+    private static final int MAX_CHUNK_SIZE = 800;       // 块大小上限
+    private static final int OVERLAP_SIZE = 40;          // 重叠字符数
     private static final int TABLE_MAX_ROWS = 10;        // 表格单块最大行数
     private static final Pattern SENTENCE_END = Pattern.compile("[。！？\\n]");  // 句子结束符
 

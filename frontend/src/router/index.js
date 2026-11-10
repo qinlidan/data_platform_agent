@@ -1,7 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 
 const routes = [
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/Login.vue'),
+    meta: { title: '登录', requiresAuth: false }
+  },
   {
     path: '/',
     component: Layout,
@@ -48,6 +55,12 @@ const routes = [
         name: 'ConfidenceCalibration',
         component: () => import('@/views/ConfidenceCalibration.vue'),
         meta: { title: '置信度阈值标定' }
+      },
+      {
+        path: '/ai',
+        name: 'AIAssistant',
+        component: () => import('@/views/AIAssistant.vue'),
+        meta: { title: 'AI 助手' }
       }
     ]
   }
@@ -56,6 +69,17 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// 全局前置守卫：鉴权检查
+router.beforeEach((to, from, next) => {
+  // 设置页面标题
+  if (to.meta.title) {
+    document.title = `${to.meta.title} - 数据平台`
+  }
+
+  // 跳过所有鉴权，直接访问
+  next()
 })
 
 export default router

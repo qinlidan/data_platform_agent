@@ -4,75 +4,91 @@
     <div class="job-list-container">
       <!-- 搜索区域 -->
       <el-card class="search-card" shadow="never">
-      <el-form :model="searchForm" :inline="true">
-        <el-form-item label="作业状态">
-          <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 150px">
-            <el-option label="草稿" value="DRAFT" />
-            <el-option label="已发布" value="PUBLISHED" />
-          </el-select>
-        </el-form-item>
+        <el-form :model="searchForm" label-width="auto">
+          <el-row :gutter="16">
+            <el-col :span="6">
+              <el-form-item label="作业状态">
+                <el-select v-model="searchForm.status" placeholder="请选择" clearable>
+                  <el-option label="草稿" value="DRAFT" />
+                  <el-option label="已发布" value="PUBLISHED" />
+                </el-select>
+              </el-form-item>
+            </el-col>
 
-        <el-form-item label="作业类型">
-          <el-select v-model="searchForm.jobType" placeholder="请选择" clearable style="width: 150px">
-            <el-option label="DB2HIVE" value="DB2HIVE" />
-            <el-option label="HIVE2HIVE" value="HIVE2HIVE" />
-          </el-select>
-        </el-form-item>
+            <el-col :span="6">
+              <el-form-item label="作业类型">
+                <el-select v-model="searchForm.jobType" placeholder="请选择" clearable>
+                  <el-option label="DB2HIVE" value="DB2HIVE" />
+                  <el-option label="HIVE2HIVE" value="HIVE2HIVE" />
+                </el-select>
+              </el-form-item>
+            </el-col>
 
-        <el-form-item label="源数据源">
-          <el-select v-model="searchForm.sourceDatasourceId" placeholder="请选择" clearable style="width: 150px">
-            <el-option
-              v-for="ds in datasourceList"
-              :key="ds.id"
-              :label="ds.sourceName"
-              :value="ds.id"
-            />
-          </el-select>
-        </el-form-item>
+            <el-col :span="6">
+              <el-form-item label="源数据源">
+                <el-select v-model="searchForm.sourceDatasourceId" placeholder="请选择" clearable>
+                  <el-option
+                    v-for="ds in datasourceList"
+                    :key="ds.id"
+                    :label="ds.sourceName"
+                    :value="ds.id"
+                  />
+                </el-select>
+              </el-form-item>
+            </el-col>
 
-        <el-form-item label="源库名">
-          <el-input
-            v-model="searchForm.sourceDatabase"
-            placeholder="请输入源库名"
-            clearable
-            style="width: 150px"
-          />
-        </el-form-item>
+            <el-col :span="6">
+              <el-form-item label="作业频率">
+                <el-select v-model="searchForm.scheduleFrequency" placeholder="请选择" clearable>
+                  <el-option label="日" value="DAILY" />
+                  <el-option label="周" value="WEEKLY" />
+                  <el-option label="月" value="MONTHLY" />
+                  <el-option label="年" value="YEARLY" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
 
-        <el-form-item label="源表名">
-          <el-input
-            v-model="searchForm.sourceTable"
-            placeholder="请输入源表名"
-            clearable
-            style="width: 150px"
-          />
-        </el-form-item>
+          <el-row :gutter="16">
+            <el-col :span="6">
+              <el-form-item label="源库名">
+                <el-input
+                  v-model="searchForm.sourceDatabase"
+                  placeholder="请输入源库名"
+                  clearable
+                />
+              </el-form-item>
+            </el-col>
 
-        <el-form-item label="作业频率">
-          <el-select v-model="searchForm.scheduleFrequency" placeholder="请选择" clearable style="width: 150px">
-            <el-option label="日" value="DAILY" />
-            <el-option label="周" value="WEEKLY" />
-            <el-option label="月" value="MONTHLY" />
-            <el-option label="年" value="YEARLY" />
-          </el-select>
-        </el-form-item>
+            <el-col :span="6">
+              <el-form-item label="源表名">
+                <el-input
+                  v-model="searchForm.sourceTable"
+                  placeholder="请输入源表名"
+                  clearable
+                />
+              </el-form-item>
+            </el-col>
 
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">
-            <el-icon><Search /></el-icon>
-            搜索
-          </el-button>
-          <el-button @click="handleReset">
-            <el-icon><Refresh /></el-icon>
-            重置
-          </el-button>
-          <el-button type="primary" @click="handleCreate">
-            <el-icon><Plus /></el-icon>
-            新建作业
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+            <el-col :span="12">
+              <el-form-item label=" " class="button-group">
+                <el-button type="primary" @click="handleSearch">
+                  <el-icon><Search /></el-icon>
+                  搜索
+                </el-button>
+                <el-button @click="handleReset">
+                  <el-icon><Refresh /></el-icon>
+                  重置
+                </el-button>
+                <el-button type="primary" @click="handleCreate">
+                  <el-icon><Plus /></el-icon>
+                  新建作业
+                </el-button>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+      </el-card>
 
     <!-- 表格区域 -->
     <el-card class="table-card" shadow="never">
@@ -190,14 +206,14 @@
           class="usage-tips"
         >
           <div class="tips-content">
-            <p>💡 你可以用自然语言与 AI 助手对话，快速创建和管理作业：</p>
+            <p>💡 你可以用自然语言与 AI 助手对话，快速管理作业、数据源及Spark调优问答：</p>
             <ul>
               <li>创建作业："帮我创建一个从 DB2 的 PRODDB.user_info 迁移到 Hive 的 dw.dim_user 的作业"</li>
               <li>查询作业："查询作业 job_001 的详情"</li>
               <li>更新作业："修改作业 job_001 的目标表为 dw.dim_user_v2"</li>
               <li>查看列表："查看最近的作业列表"</li>
             </ul>
-            <p class="warning-text">⚠️ 删除和发布作业需要二次确认</p>
+            <p class="warning-text">⚠️ 删除和发布操作需要二次确认</p>
           </div>
         </el-alert>
 
@@ -1287,6 +1303,15 @@ const handleCancel = (msg) => {
 
 .search-card {
   margin-bottom: 16px;
+}
+
+.search-card .el-select,
+.search-card .el-input {
+  width: 100%;
+}
+
+.search-card .button-group {
+  text-align: right;
 }
 
 .pagination {

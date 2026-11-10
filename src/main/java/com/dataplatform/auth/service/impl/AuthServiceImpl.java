@@ -105,19 +105,25 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse login(LoginRequest request) {
-        String email = request.getEmail();
+        String username = request.getUsername();
         String password = request.getPassword();
         String code = request.getCode();
 
-        // 查询用户
-        User user = userService.findByEmail(email);
+        // 支持用户名或邮箱登录
+        String usernameOrEmail = username;
+        if (usernameOrEmail == null || usernameOrEmail.isEmpty()) {
+            usernameOrEmail = request.getEmail(); // 兼容旧接口
+        }
+
+        // 查询用户（支持用户名、邮箱、ID）
+        User user = userService.findByUsernameOrEmail(usernameOrEmail);
         if (user == null) {
-            throw new BusinessException("邮箱或密码错误");
+            throw new BusinessException("用户名或密码错误");
         }
 
         // 验证密码
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new BusinessException("邮箱或密码错误");
+            throw new BusinessException("用户名或密码错误");
         }
 
         // 检查账号状态
@@ -137,7 +143,7 @@ public class AuthServiceImpl implements AuthService {
             }
 
             // 验证码校验
-            if (!codeService.validateCode(email, code, CodeType.LOGIN)) {
+            if (!codeService.validateCode(user.getEmail(), code, CodeType.LOGIN)) {
                 throw new BusinessException("验证码错误或已过期");
             }
 
@@ -152,8 +158,29 @@ public class AuthServiceImpl implements AuthService {
         AuthResponse response = new AuthResponse();
         response.setToken(token);
         response.setNeedCode(false);
+        response.setUsername(user.getEmail().split("@")[0]); // 从邮箱提取用户名
+        response.setRole("user"); // 默认角色
 
-        log.info("用户登录成功: email={}, needCode={}", email, needCode);
+        log.info("用户登录成功: userId={}, email={}, needCode={}", user.getId(), user.getEmail(), needCode);
+        return response;
+    }
+
+    @Override
+    public AuthResponse guestLogin() {
+        // 游客登录使用特殊的用户 ID 和标识
+        String guestId = "guest";
+        String guestEmail = "guest@demo.com";
+
+        // 生成游客 Token（不需要验证时间）
+        String token = jwtUtil.generateToken(guestId, guestEmail, LocalDateTime.now());
+
+        AuthResponse response = new AuthResponse();
+        response.setToken(token);
+        response.setNeedCode(false);
+        response.setUsername("游客");
+        response.setRole("guest");
+
+        log.info("游客登录成功");
         return response;
     }
 

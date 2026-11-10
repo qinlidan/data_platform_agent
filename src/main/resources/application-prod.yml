@@ -2,18 +2,35 @@ spring:
   application:
     name: data-platform
 
-  # 数据库配置 - 生产环境使用环境变量
+  # Redis 配置 - 阿里云内网
+  redis:
+    host: r-bp1logqxbtf7sexm3.redis.rds.aliyuncs.com
+    port: 6379
+    database: 0
+    timeout: 3000ms
+
+  # 数据库配置 - 阿里云内网地址
   datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/data_platform?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
-    username: ${SPRING_DATASOURCE_USERNAME:root}
-    password: ${SPRING_DATASOURCE_PASSWORD:root123456}
-    hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+    # MySQL 主数据源（MyBatis-Plus）
+    mysql:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      jdbc-url: jdbc:mysql://rm-bp1drr56w0kwx946r.mysql.rds.aliyuncs.com:3306/data_platform?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      username: test_data_platform
+      password: 1987WDD@
+    # PostgreSQL 向量库数据源（Spring Data JPA）
+    postgres:
+      driver-class-name: org.postgresql.Driver
+      jdbc-url: jdbc:postgresql://pgm-bp11d4i73j6xz5mf.pg.rds.aliyuncs.com:5432/knowledge_vector?useUnicode=true&characterEncoding=UTF-8&useSSL=false
+      username: test_pgvector
+      password: 1987WDD@
+      jpa:
+        hibernate:
+          ddl-auto: none
+        show-sql: false
+        properties:
+          hibernate:
+            dialect: org.hibernate.dialect.PostgreSQLDialect
+            format_sql: false
 
   jackson:
     time-zone: GMT+8
@@ -21,19 +38,51 @@ spring:
     serialization:
       write-dates-as-timestamps: false
 
-  # Spring AI 配置 - 禁用默认的 OpenAI 自动配置
+  # Flyway 配置
+  flyway:
+    enabled: true
+    locations: classpath:db/migration,classpath:db/seed
+    baseline-on-migrate: true
+
+  # Spring AI 配置
   ai:
     openai:
       api-key: dummy
       base-url: https://api.openai.com
       chat:
         enabled: false
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY}
+      chat:
+        options:
+          model: qwen3.8-flash
+          temperature: 0.7
+      embedding:
+        enabled: true
+        options:
+          model: text-embedding-v3
+
+  # 邮件服务配置
+  mail:
+    host: smtp.163.com
+    port: 465
+    username: 17766238993@163.com
+    password: ${MAIL_PASSWORD:ZRYM339mZrztCZyA}
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+            required: true
+    default-encoding: UTF-8
 
 # MyBatis-Plus 配置
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl  # 生产环境使用 slf4j
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
   global-config:
     db-config:
       id-type: auto
@@ -42,14 +91,14 @@ mybatis-plus:
       logic-not-delete-value: 0
   mapper-locations: classpath*:/mapper/**/*.xml
 
-# JWT 配置 - 生产环境使用环境变量
+# JWT 配置
 jwt:
-  secret: ${JWT_SECRET:dataplatform-secret-key-for-jwt-token-generation-2024}
-  expiration: ${JWT_EXPIRATION:86400000}  # 24小时，单位：毫秒
+  secret: ${JWT_SECRET:dataplatform-jwt-secret-key-at-least-32-characters-for-hs256-algorithm}
+  expiration: 604800000
 
 # 服务器配置
 server:
-  port: 8089
+  port: 3000
   servlet:
     context-path: /
   compression:
@@ -93,3 +142,60 @@ logging:
       max-file-size: 100MB
       max-history: 30
       total-size-cap: 10GB
+
+# AI 配置
+ai:
+  dashscope:
+    api-key: ${DASHSCOPE_API_KEY}
+    base-url: https://ws-0qvl6bswjpub8oz9.cn-beijing.maas.aliyuncs.com/compatible-mode
+    model: qwen3.8-flash
+  deepseek:
+    api-key: ${DEEPSEEK_API_KEY}
+    base-url: https://api.deepseek.com
+    model: deepseek-chat
+
+# 工具治理配置
+tool:
+  governance:
+    permission:
+      deleteJob: []
+      publishJob: []
+    confirmation:
+      enabled: true
+      tools: [deleteJob, publishJob]
+    timeout:
+      default-ms: 30000
+      write-operation-ms: 60000
+      per-tool:
+        executeSQL: 60000
+        listRecentJobs: 15000
+        searchJobs: 15000
+        getJobDetails: 10000
+    retry:
+      enabled: true
+      max-attempts: 3
+      write-operations: false
+  test:
+    simulation:
+      enabled: false
+
+# 工作流配置
+workflow:
+  intent-classification:
+    enabled: true
+  rag:
+    vector-sim-threshold: 0.5
+    rerank-threshold: 0.6
+  deterministic:
+    require-confirmation: true
+  responses:
+    chitchat: "很高兴和你聊天！有什么数据平台相关的问题可以问我。"
+    other: "抱歉，我只能回答数据平台相关的问题。"
+
+# 知识库置信度配置
+knowledge:
+  confidence:
+    threshold: 0.17
+  rerank:
+    url: https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank
+    model: qwen3.7-text-rerank

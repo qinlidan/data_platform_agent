@@ -40,6 +40,22 @@ public class JwtUtil {
                 .compact();
     }
 
+    // 为游客登录提供的重载方法（userId 为字符串）
+    public String generateToken(String userId, String email, LocalDateTime lastVerifiedAt) {
+        Date now = new Date();
+        Date expiration = new Date(now.getTime() + jwtProperties.getExpiration());
+
+        return Jwts.builder()
+                .claim("userId", userId)
+                .claim("email", email)
+                .claim("lastVerifiedAt", lastVerifiedAt != null ?
+                    Date.from(lastVerifiedAt.atZone(ZoneId.systemDefault()).toInstant()).getTime() : null)
+                .issuedAt(now)
+                .expiration(expiration)
+                .signWith(getSignKey())
+                .compact();
+    }
+
     public boolean validateToken(String token) {
         try {
             Jwts.parser()

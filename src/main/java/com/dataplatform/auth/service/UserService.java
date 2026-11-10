@@ -13,6 +13,12 @@ public interface UserService {
     User findByEmail(String email);
 
     /**
+     * 根据用户名或邮箱查询用户
+     * 如果输入包含@，按邮箱查询；否则尝试匹配邮箱前缀或ID
+     */
+    User findByUsernameOrEmail(String usernameOrEmail);
+
+    /**
      * 创建新用户
      */
     User createUser(String email, String encryptedPassword);

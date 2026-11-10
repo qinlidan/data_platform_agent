@@ -27,6 +27,11 @@ public interface AuthService {
     AuthResponse login(LoginRequest request);
 
     /**
+     * 游客登录（演示模式）
+     */
+    AuthResponse guestLogin();
+
+    /**
      * 重置密码
      */
     void resetPassword(ResetPasswordRequest request);
