@@ -264,15 +264,21 @@ public class ChunkerPipeline {
                 continue;
             }
 
-            // 添加前一块的重叠内容
+            // 添加前一块的重叠内容（仅当属于同一 section 时）
             if (i > 0) {
                 ChunkDTO previous = chunks.get(i - 1);
-                String prevContent = previous.getAnswer();
-                if (prevContent.length() > OVERLAP_SIZE) {
-                    String overlap = prevContent.substring(prevContent.length() - OVERLAP_SIZE);
-                    // 裁到最近的句号
-                    overlap = trimToSentenceEnd(overlap, false);
-                    content = overlap + content;
+                String currentSectionPath = current.getSectionPath();
+                String previousSectionPath = previous.getSectionPath();
+
+                // 只有 sectionPath 相同才添加 overlap（避免跨标题污染）
+                if (currentSectionPath != null && currentSectionPath.equals(previousSectionPath)) {
+                    String prevContent = previous.getAnswer();
+                    if (prevContent.length() > OVERLAP_SIZE) {
+                        String overlap = prevContent.substring(prevContent.length() - OVERLAP_SIZE);
+                        // 裁到最近的句号
+                        overlap = trimToSentenceEnd(overlap, false);
+                        content = overlap + content;
+                    }
                 }
             }
 

@@ -17,9 +17,11 @@ import java.util.List;
  * 使用 COSINE 距离度量 (<=> 操作符)
  *
  * Task 4 - Step 6
+ *
+ * 继承 KnowledgeVectorRepositoryCustom 以支持自定义原生 SQL（绕过 JSqlParser）
  */
 @Repository
-public interface KnowledgeVectorRepository extends JpaRepository<KnowledgeVector, Long> {
+public interface KnowledgeVectorRepository extends JpaRepository<KnowledgeVector, Long>, KnowledgeVectorRepositoryCustom {
 
     /**
      * Upsert向量（ON CONFLICT UPDATE）- 包含混合检索字段
@@ -145,30 +147,6 @@ public interface KnowledgeVectorRepository extends JpaRepository<KnowledgeVector
                 @Param("routeAction") String routeAction,
                 @Param("createdAt") LocalDateTime createdAt,
                 @Param("updatedAt") LocalDateTime updatedAt);
-
-    /**
-     * 向量相似度检索（使用 COSINE 距离）
-     * 使用函数形式 cosine_distance() 以兼容 JSqlParser
-     * 返回 top-k 最相似的 chunk_id
-     *
-     * @param embedding 查询向量字符串，格式：[0.1,0.2,...]
-     * @param docType 文档类型过滤（null表示不过滤）
-     * @param limit 返回top-k结果数量
-     * @return 按相似度降序排列的结果列表
-     */
-    @Query(value = """
-        SELECT chunk_id AS chunkId,
-               doc_type AS docType,
-               route_action AS routeAction,
-               1 - cosine_distance(embedding, CAST(:embedding AS vector)) AS score
-        FROM knowledge_vectors
-        WHERE (:docType IS NULL OR doc_type = :docType)
-        ORDER BY cosine_distance(embedding, CAST(:embedding AS vector))
-        LIMIT :limit
-        """, nativeQuery = true)
-    List<VectorSearchResult> searchSimilar(@Param("embedding") String embedding,
-                                           @Param("docType") String docType,
-                                           @Param("limit") int limit);
 
     /**
      * 批量删除向量（用于重新导入时清理旧数据）

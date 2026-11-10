@@ -18,7 +18,7 @@ public class KnowledgeBaseInitializer implements ApplicationListener<Application
 
     @Override
     public void onApplicationEvent(ApplicationReadyEvent event) {
-//        log.info("开始自动导入知识库文档");
-//        knowledgeImportService.autoImportFromDataQuery();
+        log.info("开始自动导入知识库文档");
+        knowledgeImportService.autoImportFromDataQuery();
     }
 }
