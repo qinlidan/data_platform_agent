@@ -25,23 +25,43 @@ public class KnowledgeVectorRepositoryImpl implements KnowledgeVectorRepositoryC
 
     @Override
     public List<VectorSearchResult> searchSimilar(String embedding, String docType, int limit) {
-        String sql = """
+        // 动态构建 SQL，避免 PostgreSQL 参数类型推断问题
+        String baseSql = """
             SELECT chunk_id,
                    doc_type,
                    route_action,
                    1 - (embedding <=> CAST(?1 AS vector)) AS score
             FROM knowledge_vectors
-            WHERE (?2 IS NULL OR doc_type = ?3)
-            ORDER BY embedding <=> CAST(?4 AS vector)
-            LIMIT ?5
             """;
+
+        String sql;
+        int embeddingParamIndex;
+        int limitParamIndex;
+
+        if (docType != null && !docType.trim().isEmpty()) {
+            // 有 docType 过滤
+            sql = baseSql + "WHERE doc_type = ?2\n" +
+                  "ORDER BY embedding <=> CAST(?3 AS vector)\n" +
+                  "LIMIT ?4";
+            embeddingParamIndex = 3;
+            limitParamIndex = 4;
+        } else {
+            // 无 docType 过滤
+            sql = baseSql +
+                  "ORDER BY embedding <=> CAST(?2 AS vector)\n" +
+                  "LIMIT ?3";
+            embeddingParamIndex = 2;
+            limitParamIndex = 3;
+        }
 
         Query query = entityManager.createNativeQuery(sql);
         query.setParameter(1, embedding);
-        query.setParameter(2, docType);
-        query.setParameter(3, docType);
-        query.setParameter(4, embedding);
-        query.setParameter(5, limit);
+
+        if (docType != null && !docType.trim().isEmpty()) {
+            query.setParameter(2, docType);
+        }
+        query.setParameter(embeddingParamIndex, embedding);
+        query.setParameter(limitParamIndex, limit);
 
         @SuppressWarnings("unchecked")
         List<Object[]> results = query.getResultList();
