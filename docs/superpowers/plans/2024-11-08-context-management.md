@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 为数据平台智能客服添加三层上下文管理（Layer 0 摘要层、Layer 2 半压层、Layer 1 原文层），支持异步压缩、Token 预算控制、多会话隔离。
+**Goal:** 为数据平台智能客服添加三层上下文管理
+（Layer 0 摘要层、Layer 2 半压层、Layer 1 原文层），支持异步压缩、Token 预算控制、多会话隔离。
 
-**Architecture:** 自定义 MyBatis 实现的 ChatMemoryRepository + 三层拼装 Advisor + 异步摘要服务。使用两个锚点（summary_upto_msg_id、layer1_from_msg_id）划分三层，降级操作只挪锚点，不修改原始消息数据。
+**Architecture:** 自定义 MyBatis 实现的 ChatMemoryRepository + 三层拼装 Advisor + 异步摘要服务。使用两个锚点
+（summary_upto_msg_id、layer1_from_msg_id）划分三层，降级操作只挪锚点，不修改原始消息数据。
 
 **Tech Stack:** Spring AI 1.0.0 GA + Spring Boot 3.2.2 + MyBatis-Plus + MySQL 5.7 + @Async
 

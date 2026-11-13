@@ -16,6 +16,18 @@ public class ConversationSummary {
 
     private Integer seq;
 
+    /**
+     * 这段摘要覆盖的起始消息ID（不含）
+     */
+    @TableField("from_msg_id")
+    private Long fromMsgId;
+
+    /**
+     * 这段摘要覆盖的结束消息ID（含）
+     */
+    @TableField("upto_msg_id")
+    private Long uptoMsgId;
+
     private String content;
 
     @TableField(fill = FieldFill.INSERT)

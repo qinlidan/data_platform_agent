@@ -35,16 +35,40 @@ public class ConversationService extends ServiceImpl<ConversationMapper, Convers
      */
     public Long createConversation(String userId, String title) {
         Long conversationId = idGenerator.nextId();
+        log.info("[ConversationService] 准备创建会话: conversationId={}, userId={}, title={}", conversationId, userId, title);
 
         Conversation conversation = new Conversation();
         conversation.setId(conversationId);
         conversation.setUserId(userId);
         conversation.setTitle(title != null ? title : "新会话");
         conversation.setStatus(ConversationStatus.ACTIVE);
-        conversation.setCreatedAt(LocalDateTime.now());
-        conversation.setUpdatedAt(LocalDateTime.now());
-        save(conversation);
-        log.debug("[ConversationService] Created new conversation: id={}, userId={}", conversationId, userId);
+
+        // 兜底：如果自动填充失败，手动设置时间
+        if (conversation.getCreatedAt() == null) {
+            conversation.setCreatedAt(LocalDateTime.now());
+        }
+        if (conversation.getUpdatedAt() == null) {
+            conversation.setUpdatedAt(LocalDateTime.now());
+        }
+
+        log.info("[ConversationService] 调用 save() 保存会话到数据库: {}", conversation);
+        boolean saved = save(conversation);
+        log.info("[ConversationService] save() 返回结果: saved={}", saved);
+
+        if (!saved) {
+            log.error("[ConversationService] ❌ Failed to create conversation: userId={}, title={}", userId, title);
+            throw new RuntimeException("创建会话失败");
+        }
+
+        // 验证是否真的保存成功
+        Conversation verify = getById(conversationId);
+        if (verify == null) {
+            log.error("[ConversationService] ❌ 严重错误：save() 返回 true 但数据库中查不到记录: conversationId={}", conversationId);
+        } else {
+            log.info("[ConversationService] ✅ 验证成功：会话已保存到数据库: conversationId={}", conversationId);
+        }
+
+        log.info("[ConversationService] ✅ Created new conversation: id={}, userId={}", conversationId, userId);
 
         return conversationId;
     }

@@ -86,9 +86,9 @@ layer2_budget = history_budget × 0.3
 1. 在后台异步触发摘要任务 (`@Async("summaryExecutor")`)
 2. 摘要任务读取 `(summary_upto_msg_id, layer1_from_msg_id]` 区间消息
 3. 调 LLM 生成摘要（提炼事实、诉求、项目编号、数据集名，长度几十到一两百字）
-4. 追加新段落到 `conversation_summaries` (seq 自增)
+4. 追**加新段落到 `conversation_summaries` (seq 自增)
 5. 更新 `conversations.summary_upto_msg_id = layer1_from_msg_id`
-6. 拼接所有摘要段落更新 `conversations.summary` 字段
+6. 拼接所有摘要段落更新 `conversations.summary` 字段**
 
 **不阻塞**: 摘要生成期间，当前轮回复正常返回
 

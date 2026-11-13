@@ -76,13 +76,8 @@ public class JobTool {
             - 数据源配置：源库表、目标库表、执行引擎
             - 版本信息：当前版本、发布版本
             - 创建和更新时间
-
-            参数：
-            - jobId: 作业ID，必填
-
-            返回：格式化的作业详情字符串
-            说明：本工具getJobDetails无法直接返回数据源详情，只能拿到数据源id,SourceDatasourceId之后，
-            调用数据源查询工具才能获取数据源详情
+            1. 参数 jobId 必须是数字。如果用户提供的是英文名或中文名，请先调用 searchJobs 工具获取数字 ID。
+            2. 本工具无法直接返回数据源 URL！只能返回数据源 ID (SourceDatasourceId)。如果用户想查数据源 URL，必须在获取此工具的结果后，紧接着调用 getDataSourceDetails 工具。
             """)
     public String getJobDetails(@ToolParam(description = "作业ID") Long jobId) {
         try {

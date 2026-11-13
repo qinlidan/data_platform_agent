@@ -69,7 +69,11 @@
       </el-aside>
 
       <el-main class="app-main">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <keep-alive :include="['JobList', 'AIAssistant']">
+            <component :is="Component" />
+          </keep-alive>
+        </router-view>
       </el-main>
     </div>
   </div>

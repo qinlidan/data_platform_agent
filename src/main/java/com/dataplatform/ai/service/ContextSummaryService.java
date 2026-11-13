@@ -1,9 +1,11 @@
 package com.dataplatform.ai.service;
 
 import com.dataplatform.entity.Conversation;
+import com.dataplatform.entity.ConversationSummary;
 import com.dataplatform.entity.Message;
 import com.dataplatform.entity.MessageRole;
 import com.dataplatform.mapper.ConversationMapper;
+import com.dataplatform.mapper.ConversationSummaryMapper;
 import com.dataplatform.mapper.MessageMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +28,7 @@ public class ContextSummaryService {
     private final ChatClient.Builder chatClientBuilder;
     private final MessageMapper messageMapper;
     private final ConversationMapper conversationMapper;
+    private final ConversationSummaryMapper summaryMapper;
 
     /**
      * 异步生成 Layer 2 摘要
@@ -58,38 +61,36 @@ public class ContextSummaryService {
                     .call()
                     .content();
 
-            // 4. 加载旧摘要并合并
+            // 4. 加载会话和计算新的 seq
             Conversation conversation = conversationMapper.selectById(conversationId);
-            String oldSummary = conversation.getSummary();
-            String mergedSummary;
+            List<ConversationSummary> existingSummaries = summaryMapper.selectByConversationId(conversationId);
+            int nextSeq = existingSummaries.isEmpty() ? 1 : existingSummaries.get(existingSummaries.size() - 1).getSeq() + 1;
 
-            if (oldSummary == null || oldSummary.isEmpty()) {
-                mergedSummary = newSummary;
-            } else {
-                // 如果有旧摘要，合并新旧摘要
-                String mergePrompt = String.format("""
-                        【旧摘要】
-                        %s
+            // 5. 保存新摘要段落到 conversation_summaries 表
+            ConversationSummary summarySegment = new ConversationSummary();
+            summarySegment.setConversationId(conversationId);
+            summarySegment.setSeq(nextSeq);
+            summarySegment.setFromMsgId(fromMsgId);
+            summarySegment.setUptoMsgId(uptoMsgId);
+            summarySegment.setContent(newSummary);
+            summaryMapper.insert(summarySegment);
 
-                        【新增对话摘要】
-                        %s
+            log.info("[Summary] Saved summary segment {} for conversation {}, msg range ({}, {}]",
+                    nextSeq, conversationId, fromMsgId, uptoMsgId);
 
-                        请合并上述两部分摘要，保持时间顺序，去除冗余，输出一份完整摘要：
-                        """, oldSummary, newSummary);
+            // 6. 拼接所有摘要段落并更新 conversations.summary 字段
+            String fullSummary = existingSummaries.stream()
+                    .map(ConversationSummary::getContent)
+                    .reduce("", (a, b) -> a.isEmpty() ? b : a + "\n\n" + b);
+            fullSummary = fullSummary.isEmpty() ? newSummary : fullSummary + "\n\n" + newSummary;
 
-                mergedSummary = chatClient.prompt()
-                        .user(mergePrompt)
-                        .call()
-                        .content();
-            }
-
-            // 5. 更新会话摘要和锚点
-            conversation.setSummary(mergedSummary);
+            // 7. 更新会话摘要和锚点
+            conversation.setSummary(fullSummary);
             conversation.setSummaryUptoMsgId(uptoMsgId);
             conversationMapper.updateById(conversation);
 
-            log.info("[Summary] Completed summarizing conversation {}, new summary length: {}",
-                    conversationId, mergedSummary.length());
+            log.info("[Summary] Completed summarizing conversation {}, total summary length: {}",
+                    conversationId, fullSummary.length());
 
         } catch (Exception e) {
             log.error("[Summary] Failed to summarize conversation " + conversationId, e);

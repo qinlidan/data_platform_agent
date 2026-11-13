@@ -77,7 +77,7 @@ spring:
     port: 465
     username: 17766238993@163.com
     password: ${MAIL_PASSWORD:ZRYM339mZrztCZyA}
-    protocol: smtp
+    protocol: smtps
     properties:
       mail:
         smtp:
@@ -85,6 +85,12 @@ spring:
           ssl:
             enable: true
             required: true
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
+            port: 465
+            fallback: false
+          timeout: 5000
+          connectiontimeout: 5000
     default-encoding: UTF-8
 
 # MyBatis-Plus 配置

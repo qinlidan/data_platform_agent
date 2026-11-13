@@ -144,6 +144,12 @@
   </div>
 </template>
 
+<script>
+export default {
+  name: 'AIAssistant'
+}
+</script>
+
 <script setup>
 import { ref, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'

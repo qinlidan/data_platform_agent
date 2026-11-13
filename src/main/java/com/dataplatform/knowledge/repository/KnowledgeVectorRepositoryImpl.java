@@ -72,7 +72,17 @@ public class KnowledgeVectorRepositoryImpl implements KnowledgeVectorRepositoryC
             dto.setChunkId(((Number) row[0]).longValue());
             dto.setDocType((String) row[1]);
             dto.setRouteAction((String) row[2]);
-            dto.setScore((BigDecimal) row[3]);
+
+            // score 可能是 Double 或 BigDecimal，统一转换
+            Object scoreObj = row[3];
+            if (scoreObj instanceof Double) {
+                dto.setScore(BigDecimal.valueOf((Double) scoreObj));
+            } else if (scoreObj instanceof BigDecimal) {
+                dto.setScore((BigDecimal) scoreObj);
+            } else if (scoreObj instanceof Number) {
+                dto.setScore(BigDecimal.valueOf(((Number) scoreObj).doubleValue()));
+            }
+
             dtoList.add(new VectorSearchResultAdapter(dto));
         }
 

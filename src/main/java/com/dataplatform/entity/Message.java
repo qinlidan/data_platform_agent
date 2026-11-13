@@ -50,7 +50,7 @@ public class Message {
     /**
      * 创建时间
      */
-    @TableField(fill = FieldFill.INSERT)
-      @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
 }

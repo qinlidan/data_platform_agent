@@ -172,7 +172,7 @@ public class AiAssistantController {
         Map<String, Object> result = new HashMap<>();
         result.put("message", response);
         result.put("needConfirmation", false);
-        result.put("conversationId", conversationId);
+        result.put("conversationId", String.valueOf(conversationId)); // 转为字符串避免JS精度丢失
         result.put("citations", usedCitations);
         result.put("hasKnowledgeBase", chatContext.hasKnowledgeBase());
 
@@ -332,6 +332,9 @@ public class AiAssistantController {
             @RequestParam(required = false) Long conversationId,
             @RequestHeader(value = "X-Confirmation-Token", required = false) String confirmationToken
     ) {
+        System.out.println("========== DEBUG: chatStream 方法被调用了！message=" + message);
+        log.error("========== DEBUG: chatStream 方法被调用了！message={}", message);
+
         if (message == null || message.trim().isEmpty()) {
             return Flux.just(ServerSentEvent.<Map<String, Object>>builder()
                     .event("error")
@@ -346,7 +349,6 @@ public class AiAssistantController {
             // 获取或创建会话
             if (conversationId == null) {
                 conversationId = conversationService.getOrCreateConversation(userId, null);
-                log.info("创建新会话: conversationId={}", conversationId);
             }
 
             final Long finalConversationId = conversationId;
@@ -361,7 +363,9 @@ public class AiAssistantController {
                     finalConversationId, originalMessage, resolvedMessage);
 
             // 异步落表：用户消息（保存原始消息）
+            log.info("[AiController] 准备发布用户消息保存事件: conversationId={}, message={}", finalConversationId, originalMessage);
             eventPublisher.publishEvent(new MessageSaveEvent(this, finalConversationId, "user", originalMessage));
+            log.info("[AiController] 用户消息保存事件已发布");
 
             // ========== STEP 2：意图识别分流 ==========
             com.dataplatform.workflow.dto.IntentClassificationResult intentResult =
@@ -431,9 +435,14 @@ public class AiAssistantController {
                 .doOnComplete(() -> {
                     // 异步落表：助手完整响应
                     if (assistantResponse.length() > 0) {
+                        log.info("[QA Stream] 准备发布助手消息保存事件: conversationId={}, length={}",
+                            conversationId, assistantResponse.length());
                         eventPublisher.publishEvent(new MessageSaveEvent(
                                 this, conversationId, "assistant", assistantResponse.toString()
                         ));
+                        log.info("[QA Stream] 助手消息保存事件已发布");
+                    } else {
+                        log.warn("[QA Stream] 助手响应为空，跳过保存");
                     }
                 });
 
@@ -460,7 +469,7 @@ public class AiAssistantController {
         Flux<ServerSentEvent<Map<String, Object>>> conversationIdEvent = Flux.just(
                 ServerSentEvent.<Map<String, Object>>builder()
                         .event("conversation_id")
-                        .data(Map.of("conversationId", conversationId))
+                        .data(Map.of("conversationId", String.valueOf(conversationId))) // 转为字符串避免JS精度丢失
                         .build()
         );
 
@@ -535,9 +544,14 @@ public class AiAssistantController {
                 })
                 .doOnComplete(() -> {
                     if (assistantResponse.length() > 0) {
+                        log.info("[Manager Stream] 准备发布助手消息保存事件: conversationId={}, length={}",
+                            conversationId, assistantResponse.length());
                         eventPublisher.publishEvent(new MessageSaveEvent(
                                 this, conversationId, "assistant", assistantResponse.toString()
                         ));
+                        log.info("[Manager Stream] 助手消息保存事件已发布");
+                    } else {
+                        log.warn("[Manager Stream] 助手响应为空，跳过保存");
                     }
                     uiEventSink.tryEmitComplete();
                 })
@@ -559,7 +573,7 @@ public class AiAssistantController {
         Flux<ServerSentEvent<Map<String, Object>>> conversationIdEvent = Flux.just(
                 ServerSentEvent.<Map<String, Object>>builder()
                         .event("conversation_id")
-                        .data(Map.of("conversationId", conversationId))
+                        .data(Map.of("conversationId", String.valueOf(conversationId))) // 转为字符串避免JS精度丢失
                         .build()
         );
 
@@ -846,6 +860,7 @@ public class AiAssistantController {
             7. 查询某个作业的数据源信息时：先调用 getJobDetails 获取数据源ID，再调用 getDataSourceDetails 获取详情，不要调用 searchDataSources 或 listAllDataSources。
             8. searchDataSources 和 listAllDataSources 只用于"搜索数据源"或"列出所有数据源"这类场景，不要用于查询某个作业的数据源。
             9. 创建数据源时支持的类型：MYSQL、POSTGRESQL、ORACLE、SQLSERVER、DB2、HIVE。
-            10. 操作完成后用友好的语言反馈结果；失败时给出清晰的原因和建议。
+            10. 调用工具获取到信息后，必须在回答中包含工具返回的完整关键信息（如数据源的连接URL、作业的详细配置等），不要省略或只说"已找到"。
+            11. 操作完成后用友好的语言反馈结果；失败时给出清晰的原因和建议。
             """;
 }
